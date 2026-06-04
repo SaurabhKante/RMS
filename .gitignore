@@ -1,0 +1,49 @@
+# =========================
+# Frontend (React)
+# =========================
+frontend/node_modules/
+frontend/build/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.cache/
+
+# =========================
+# Backend (Spring Boot)
+# =========================
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+
+# Application secrets
+backend/src/main/resources/application-local.properties
+backend/src/main/resources/application-prod.properties
+
+# Logs
+backend/logs/
+backend/*.log
+
+# =========================
+# IDE Files
+# =========================
+.idea/
+.vscode/
+*.iml
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Environment Files
+# =========================
+.env
+.env.*
+
+# =========================
+# Misc
+# =========================
+coverage/
+*.tmp
+*.swp
