@@ -1,11 +1,4 @@
 import { useState } from "react";
-import {
-  FaArrowRight,
-  FaChartBar,
-  FaEye,
-  FaEyeSlash,
-  FaRocket,
-} from "react-icons/fa";
 import { 
   ArrowRight, 
   BarChart, 
