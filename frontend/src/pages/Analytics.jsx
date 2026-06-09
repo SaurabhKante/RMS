@@ -13,7 +13,15 @@ import {
 const Analytics = () => {
   return (
     <div className="p-6">
+      <div className="mb-8">
+        <h1 className="text-5xl font-bold text-teal-900">
+          Analytics Page
+        </h1>
 
+        <p className="text-gray-500 mt-2">
+          View and track the summary of restaurant transactions and orders.
+        </p>
+      </div>
       <AnalyticsFilter
         onApply={(start, end) =>
           console.log(start, end)

@@ -44,11 +44,11 @@ const DashboardHeader = ({
 
       {/* Right Section */}
       <div className="flex items-center gap-4">
-        {location.pathname === '/dishes/manage' && (
+        {/* {location.pathname === '/dishes/manage' && (
         <button onClick={() => navigate('/dishes')} className="px-4 py-2 bg-teal-800 text-white rounded-lg text-md font-semibold hover:bg-[#00363a] transition-colors">
           Back to Menu
         </button>
-      )}
+      )} */}
 
         {/* Action Button */}
         <button
