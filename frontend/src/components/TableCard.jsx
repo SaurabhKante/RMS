@@ -13,7 +13,7 @@ const TableCard = ({ table }) => {
         <div className="flex items-start justify-between">
           <div>
             <h3 className="text-lg font-semibold text-slate-800">
-              {table.tableName}
+              {table.name}
             </h3>
 
             <p className="text-sm text-slate-500 mt-1">

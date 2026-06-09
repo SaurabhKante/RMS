@@ -7,7 +7,7 @@ const AddTableModal = ({
   onSave,
 }) => {
   const [formData, setFormData] = useState({
-    tableName: "",
+    name: "",
     seats: "",
     status: "Available",
     customerName: "",
@@ -34,7 +34,7 @@ const AddTableModal = ({
     });
 
     setFormData({
-      tableName: "",
+      name: "",
       seats: "",
       status: "Available",
       customerName: "",
@@ -80,8 +80,8 @@ const AddTableModal = ({
 
             <input
               type="text"
-              name="tableName"
-              value={formData.tableName}
+              name="name"
+              value={formData.name}
               onChange={handleChange}
               placeholder="Table 12"
               required

@@ -1,5 +1,6 @@
 import { Route, Routes, useLocation } from "react-router-dom";
 
+
 import Sidebar from "./components/Sidebar";
 
 import Home from "./pages/Home";
@@ -9,6 +10,7 @@ import Expenses from "./pages/Expenses";
 import Analytics from "./pages/Analytics";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Dishmanagement from "./pages/Dishmanagement";
 
 function App() {
   const location = useLocation();
@@ -31,6 +33,8 @@ function App() {
             <Route path="/dues" element={<Dues />} />
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/analytics" element={<Analytics />} />
+            <Route path="/dishes/manage" element={<Dishmanagement />} />
+
           </Routes>
         </main>
       </div>

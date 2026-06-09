@@ -8,19 +8,19 @@ const Home = () => {
   const [tablesList, setTablesList] = useState([
     {
       id: 1,
-      tableName: "Table 01",
+      name: "Table 01",
       seats: 4,
       status: "Occupied",
     },
     {
       id: 2,
-      tableName: "Table 02",
+      name: "Table 02",
       seats: 2,
       status: "Available",
     },
     {
       id: 3,
-      tableName: "Table 08",
+      name: "Table 08",
       seats: 6,
       status: "Reserved",
       customerName: "Miller Party",
@@ -44,7 +44,7 @@ const Home = () => {
     const query = searchQuery.toLowerCase();
 
     return (
-      table.tableName.toLowerCase().includes(query) ||
+      table.name.toLowerCase().includes(query) ||
       table.status.toLowerCase().includes(query) ||
       (table.customerName &&
         table.customerName.toLowerCase().includes(query))
