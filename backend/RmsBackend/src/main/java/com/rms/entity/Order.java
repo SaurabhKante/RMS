@@ -60,4 +60,7 @@ public class Order extends BaseEntity {
     @OneToOne(mappedBy = "order", cascade = CascadeType.ALL)
     private CustomerDue customerDue;
 
+    @Column(name = "instruction")
+    private String instruction;
+
 }

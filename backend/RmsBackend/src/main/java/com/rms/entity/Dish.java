@@ -47,4 +47,10 @@ public class Dish extends BaseEntity {
     @OneToMany(mappedBy = "dish")
     private List<OrderItem> orderItems = new ArrayList<>();
 
+    @Column(name = "image_url")
+    private String imageUrl;
+
+    @Column(name = "tags")
+    private String tags;
+
 }
