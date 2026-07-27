@@ -29,5 +29,12 @@ public class DishController {
 
         return dishService.getChildDishes(parentDishId);
     }
-
+    @GetMapping("/get-all-childs")
+    public ResponseEntity<ApiResponse<Object>> getAllChildDishes(){
+        return dishService.getAllChildDishes();
+    }
+    @GetMapping("/get-all-parents")
+    public ResponseEntity<ApiResponse<Object>> getAllParentDishes(){
+        return dishService.getAllParentDishes();
+    }
 }

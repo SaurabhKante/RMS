@@ -14,7 +14,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -85,5 +89,47 @@ public class DishServiceImpl implements DishService {
                 response
         );
     }
+
+    @Override
+    public ResponseEntity<ApiResponse<Object>> getAllChildDishes() {
+          List<DishResponse> childDishes=dishRepository
+                  .findByDishTypeAndIsActiveTrue(DishType.CHILD)
+                  .stream()
+                  .map(this::convertChildResponse)
+                  .toList();
+          if(childDishes.isEmpty()) throw new ResourceNotFoundException("No Child Dishes Available...");
+
+          return ResponseHandler.success(
+                  "List Of Child Dishes Retrieved",
+                  childDishes
+          );
+    }
+
+    @Override
+    public ResponseEntity<ApiResponse<Object>> getAllParentDishes() {
+        List<DishResponse> parentDishes=dishRepository
+                .findByDishTypeAndIsActiveTrue(DishType.PARENT)
+                .stream()
+                .map(this::convertChildResponse)
+                .toList();
+
+        if(parentDishes.isEmpty()) throw new ResourceNotFoundException("No Parent Dishes Available..");
+
+        List<Map<String,Object>> allParentDishes= parentDishes
+                .stream()
+                .map(dishResponse ->
+                {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("Dish Id",dishResponse.getDishId());
+                    map.put("Dish Name",dishResponse.getDishName());
+                    return map;
+                })
+                .collect(Collectors.toList());
+        return ResponseHandler.success(
+                "List Of Parent Dishes Retrieved" ,
+                allParentDishes
+        );
+    }
+
 
 }

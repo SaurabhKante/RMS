@@ -11,4 +11,8 @@ public interface DishService {
     ResponseEntity<ApiResponse<Object>> addChildDish(@Valid AddChildDishRequest dishRequest);
 
     ResponseEntity<ApiResponse<Object>> getChildDishes(Integer parentDishId);
+
+    ResponseEntity<ApiResponse<Object>> getAllChildDishes();
+
+    ResponseEntity<ApiResponse<Object>> getAllParentDishes();
 }
