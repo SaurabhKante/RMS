@@ -25,7 +25,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+//import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -40,7 +40,7 @@ public class UserServiceImpl implements UserService {
 
     private final RoleRepository roleRepository;
 
-    private final BCryptPasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
 
     private final AuthenticationManager authenticationManager;
 
@@ -124,7 +124,7 @@ public class UserServiceImpl implements UserService {
     public ResponseEntity<ApiResponse<Object>> getAllUsers() {
         List<User> users = userRepository.findAllByIsActiveTrue();
         List<GetAllUsersResponse> response = new ArrayList<>();
-        users.forEach(user -> {
+        users.forEach(user ->
             response.add(
                     GetAllUsersResponse.builder()
                             .userId(user.getUserId())
@@ -132,8 +132,8 @@ public class UserServiceImpl implements UserService {
                             .email(user.getEmail())
                             .role(user.getRole().getRoleName())
                             .build()
-            );
-        });
+            )
+        );
                 return ResponseHandler.success("Fetch All Users Successfully.", response);
     }
 

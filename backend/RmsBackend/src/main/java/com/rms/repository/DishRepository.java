@@ -22,4 +22,6 @@ public interface DishRepository extends JpaRepository<Dish, Integer> {
     ORDER BY d.dishName
 """)
     List<Dish> findActiveChildren(@Param("parentDishId") Integer parentDishId);
+    List<Dish> findByDishTypeAndIsActiveTrue(DishType dishType);
+
 }
