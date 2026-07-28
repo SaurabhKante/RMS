@@ -1,6 +1,7 @@
 package com.rms.controller;
 
 import com.rms.dto.dish.request.AddChildDishRequest;
+import com.rms.dto.dish.request.UpdateDishRequest;
 import com.rms.service.DishService;
 import com.rms.util.ApiResponse;
 import jakarta.validation.Valid;
@@ -35,6 +36,35 @@ public class DishController {
     }
     @GetMapping("/get-all-parents")
     public ResponseEntity<ApiResponse<Object>> getAllParentDishes(){
-        return dishService.getAllParentDishes();
+    return dishService.getAllParentDishes();
+    }
+    @DeleteMapping("/remove-parent-dish/{parentDishId}")
+    public ResponseEntity<ApiResponse<Object>> deleteParentDish(
+            @PathVariable Integer parentDishId ){
+         return dishService.deleteParentDish(parentDishId);
+    }
+    @DeleteMapping("remove-child-dish/{childDishId}")
+    public ResponseEntity<ApiResponse<Object>> deleteChildDish(
+            @PathVariable Integer childDishId
+    ){
+        return dishService.deleteChildDish(childDishId);
+    }
+    @PatchMapping("update-parent-dish/{parentDishId}")
+    public ResponseEntity<ApiResponse<Object>> updateParentDish(
+            @PathVariable Integer parentDishId, @RequestBody String dishName
+    ){
+        return dishService.updateParentDish(parentDishId,dishName);
+    }
+    @PutMapping("update-child-dish")
+    public ResponseEntity<ApiResponse<Object>> updateChildDish(
+             @RequestBody UpdateDishRequest dish
+            ){
+        return dishService.updateChildDish(dish);
+    }
+    @GetMapping("get-dish/{childDishId}")
+    public ResponseEntity<ApiResponse<Object>> getChildDish(
+            @PathVariable Integer childDishId
+    ){
+        return dishService.getChildDish(childDishId);
     }
 }
