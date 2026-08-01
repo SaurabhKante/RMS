@@ -38,7 +38,7 @@ public class CustomerDue extends BaseEntity {
     @Column(name = "paid_amount", precision = 10, scale = 2)
     private BigDecimal paidAmount = BigDecimal.ZERO;
 
-    @Column(name = "due_amount", precision = 10, scale = 2, insertable = false, updatable = false)
+    @Column(name = "due_amount", precision = 10, scale = 2)
     private BigDecimal dueAmount;
 
     @Enumerated(EnumType.STRING)

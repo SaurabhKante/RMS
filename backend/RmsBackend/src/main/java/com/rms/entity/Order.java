@@ -63,4 +63,33 @@ public class Order extends BaseEntity {
     @Column(name = "instruction")
     private String instruction;
 
+
+    // Helper Methods
+    public void addOrderItem(OrderItem orderItem) {
+        orderItems.add(orderItem);
+        orderItem.setOrder(this);
+    }
+
+    public void removeOrderItem(OrderItem orderItem) {
+        orderItems.remove(orderItem);
+        orderItem.setOrder(null);
+    }
+
+    public void addPayment(Payment payment) {
+        payments.add(payment);
+        payment.setOrder(this);
+    }
+
+    public void removePayment(Payment payment) {
+        payments.remove(payment);
+        payment.setOrder(null);
+    }
+
+    public void setCustomerDue(CustomerDue customerDue) {
+        this.customerDue = customerDue;
+        if (customerDue != null) {
+            customerDue.setOrder(this);
+        }
+    }
+
 }

@@ -26,7 +26,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.rms.util.DateTimeUtil.convertUTCtoIST;
+
 import static com.rms.util.DateTimeUtil.format;
 
 @Service
