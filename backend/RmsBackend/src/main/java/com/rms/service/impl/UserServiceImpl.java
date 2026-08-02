@@ -111,6 +111,7 @@ public class UserServiceImpl implements UserService {
                 .fullName(userDetails.getFullName())
                 .email(userDetails.getEmail())
                 .role(userDetails.getRole())
+                .mobile(userDetails.getMobile())
                 .token(token)
                 .build();
 

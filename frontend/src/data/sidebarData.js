@@ -38,6 +38,11 @@ export const menuItems = [
     path: "/analytics",
     icon: BarChart3,
   },
+  {
+    title: "Profile",
+    path: "/profile",
+    icon: User,
+  },
 ];
 
 export const filterItems = [

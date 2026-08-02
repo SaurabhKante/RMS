@@ -18,11 +18,13 @@ public class CustomUserDetails implements UserDetails {
     private final String password;
     private final String role;
     private final Boolean isActive;
+    private final String mobile;
 
     public CustomUserDetails(User user) {
         this.userId = user.getUserId();
         this.fullName = user.getFullName();
         this.email = user.getEmail();
+        this.mobile = user.getMobileNo();
         this.password = user.getPassword();
         this.role = user.getRole().getRoleName();
         this.isActive = user.getIsActive();
