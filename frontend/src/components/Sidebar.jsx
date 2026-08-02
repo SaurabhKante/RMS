@@ -3,6 +3,14 @@ import { menuItems, filterItems, bottomItems } from "../data/sidebarData";
 import { NavLink } from "react-router-dom";
 
 const Sidebar = () => {
+  const role = localStorage.getItem("role"); // Show Analytics only for ADMIN
+  const filteredMenuItems = menuItems.filter((item) => {
+    if (item.title === "Analytics") {
+      return role === "ADMIN";
+    }
+    return true;
+  });
+
   return (
     <aside className="w-[250px] h-screen bg-white border-r border-gray-200 flex flex-col px-4 py-6">
       {/* Logo */}
@@ -14,12 +22,12 @@ const Sidebar = () => {
 
       {/* Main Menu */}
       <nav className="space-y-2">
-        {menuItems.map((item, index) => {
+        {filteredMenuItems.map((item, index) => {
           const Icon = item.icon;
 
           return (
             <NavLink
-            key={index}
+              key={index}
               to={item.path}
               className={({ isActive }) =>
                 `flex items-center gap-4 px-4 py-4 font-bold text-teal-900 rounded-xl

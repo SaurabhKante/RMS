@@ -94,7 +94,7 @@ public class DishServiceImpl implements DishService {
         }
 
         List<DishResponse> response = dishRepository
-                .findByDishIdAndIsActiveTrue(parentDishId)
+                .findActiveChildren(parentDishId)
                 .stream()
                 .map(this::convertChildResponse)
                 .toList();

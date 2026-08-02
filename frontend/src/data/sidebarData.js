@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 export const menuItems = [
-   {
+  {
     title: "Home",
     path: "/",
     icon: Armchair,
@@ -65,7 +65,6 @@ export const filterItems = [
     count: 6,
     badgeColor: "bg-teal-700",
   },
-  
 ];
 
 export const bottomItems = [
