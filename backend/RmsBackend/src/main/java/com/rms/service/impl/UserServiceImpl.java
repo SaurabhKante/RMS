@@ -57,16 +57,6 @@ public class UserServiceImpl implements UserService {
             );
         }
 
-        Role role = roleRepository.findByRoleName(request.getRole().toUpperCase())
-                .orElse(null);
-
-        if(role == null){
-            return ResponseHandler.validationFailed(
-                    "Invalid Role.",
-                    null
-            );
-        }
-
         User user = new User();
 
         user.setFullName(request.getFullName());
@@ -76,7 +66,7 @@ public class UserServiceImpl implements UserService {
         user.setPassword(
                 passwordEncoder.encode(request.getPassword())
         );
-
+        Role role = roleRepository.findByRoleName("USER").orElseThrow(() -> new ResourceNotFoundException("Role not found"));
         user.setRole(role);
 
         userRepository.save(user);
