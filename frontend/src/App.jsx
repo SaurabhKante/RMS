@@ -39,6 +39,8 @@ function App() {
 
               <Route path="/dishes" element={<Dishes />} />
 
+              <Route path="/dishes/:tableId" element={<Dishes />} />
+
               <Route path="/dues" element={<Dues />} />
 
               <Route path="/expenses" element={<Expenses />} />

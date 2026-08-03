@@ -32,6 +32,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static com.rms.util.DateTimeUtil.format;
 
@@ -185,6 +186,549 @@ public class OrderServiceImpl implements OrderService {
                 response
         );
 
+    }
+
+    @Override
+    @Transactional
+    public ResponseEntity<ApiResponse<Object>> addDishToOrder(
+            Integer tableId,
+            Integer dishId
+    ) {
+
+        // 1. Find Table
+        RestaurantTable table = restaurantTableRepository
+                .findById(tableId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Table not found."
+                        )
+                );
+
+        if (!Boolean.TRUE.equals(table.getIsActive())) {
+
+            throw new BadRequestException(
+                    "Table is inactive."
+            );
+        }
+
+        // 2. Find Dish
+        Dish dish = dishRepository
+                .findById(dishId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Dish not found : " + dishId
+                        )
+                );
+
+        // 3. Validate Dish
+        if (!Boolean.TRUE.equals(dish.getIsActive())) {
+
+            throw new BadRequestException(
+                    dish.getDishName() + " is inactive."
+            );
+        }
+
+        if (dish.getDishType() != DishType.CHILD) {
+
+            throw new BadRequestException(
+                    dish.getDishName() + " cannot be ordered."
+            );
+        }
+
+        // 4. Find Existing Pending Order
+        Optional<Order> existingOrder =
+                orderRepository.findByRestaurantTableAndOrderStatus(
+                        table,
+                        OrderStatus.PENDING
+                );
+
+
+        Order order;
+
+        // 5. If Pending Order Exists
+        if (existingOrder.isPresent()) {
+
+            order = existingOrder.get();
+
+            // Check whether dish already exists in this order
+            Optional<OrderItem> existingOrderItem =
+                    orderItemRepository.findByOrderAndDish(
+                            order,
+                            dish
+                    );
+
+
+            if (existingOrderItem.isPresent()) {
+
+                // Dish already exists
+                // Increase quantity by 1
+                OrderItem orderItem =
+                        existingOrderItem.get();
+
+                int newQuantity =
+                        orderItem.getQuantity() + 1;
+
+                orderItem.setQuantity(newQuantity);
+
+                orderItem.setPrice(
+                        dish.getPrice()
+                );
+
+                BigDecimal itemTotal =
+                        dish.getPrice()
+                                .multiply(
+                                        BigDecimal.valueOf(newQuantity)
+                                );
+
+                orderItem.setTotalPrice(itemTotal);
+
+                orderItemRepository.save(orderItem);
+
+            } else {
+
+                // Dish does not exist
+                // Add new dish with quantity 1
+                OrderItem orderItem = new OrderItem();
+
+                orderItem.setOrder(order);
+                orderItem.setDish(dish);
+                orderItem.setQuantity(1);
+                orderItem.setPrice(dish.getPrice());
+
+                orderItem.setTotalPrice(
+                        dish.getPrice()
+                );
+
+                orderItemRepository.save(orderItem);
+            }
+
+
+        } else {
+
+            // 6. No Pending Order
+            // Create New Order
+            CustomUserDetails currentUser =
+                    (CustomUserDetails) SecurityContextHolder
+                            .getContext()
+                            .getAuthentication()
+                            .getPrincipal();
+
+
+            User user = userRepository
+                    .findById(currentUser.getUserId())
+                    .orElseThrow(() ->
+                            new ResourceNotFoundException(
+                                    "User not found."
+                            )
+                    );
+
+            // Create Order
+            order = new Order();
+
+            order.setRestaurantTable(table);
+            order.setUser(user);
+            order.setOrderStatus(OrderStatus.PENDING);
+
+            order.setTotalAmount(
+                    dish.getPrice()
+            );
+
+            order.setDiscount(
+                    BigDecimal.ZERO
+            );
+
+            order.setFinalAmount(
+                    dish.getPrice()
+            );
+
+            // Create Order Item
+            OrderItem orderItem = new OrderItem();
+
+            orderItem.setOrder(order);
+            orderItem.setDish(dish);
+            orderItem.setQuantity(1);
+            orderItem.setPrice(dish.getPrice());
+
+            orderItem.setTotalPrice(
+                    dish.getPrice()
+            );
+
+            // Save Order
+            Order savedOrder =
+                    orderRepository.save(order);
+
+
+            orderItem.setOrder(savedOrder);
+
+            orderItemRepository.save(orderItem);
+        }
+
+        // 7. Recalculate Order Total
+        List<OrderItem> orderItems =
+                orderItemRepository.findByOrder(order);
+
+        BigDecimal totalAmount =
+                orderItems.stream()
+                        .map(OrderItem::getTotalPrice)
+                        .reduce(
+                                BigDecimal.ZERO,
+                                BigDecimal::add
+                        );
+
+
+        order.setTotalAmount(totalAmount);
+
+        // 8. Recalculate Final Amount
+        BigDecimal discount = order.getDiscount();
+
+        if (discount == null) {
+            discount = BigDecimal.ZERO;
+        }
+
+        BigDecimal finalAmount =
+                totalAmount.subtract(discount);
+
+        if (finalAmount.compareTo(BigDecimal.ZERO) < 0) {
+
+            finalAmount = BigDecimal.ZERO;
+        }
+        order.setFinalAmount(finalAmount);
+
+        // 9. Save Updated Order
+        orderRepository.save(order);
+
+        // 10. Response
+        return ResponseHandler.success(
+                "Dish added to order successfully.",
+                null
+        );
+    }
+
+    @Override
+    @Transactional
+    public ResponseEntity<ApiResponse<Object>> increaseDishQuantity(
+            Integer orderId,
+            Integer dishId
+    ) {
+
+        // Find Table
+        RestaurantTable table = restaurantTableRepository
+                .findById(orderId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Table not found."
+                        )
+                );
+
+        // Check Table Active
+        if (!Boolean.TRUE.equals(table.getIsActive())) {
+            throw new BadRequestException(
+                    "Table is inactive."
+            );
+        }
+
+        // Find Pending Order
+        Order order = orderRepository
+                .findByRestaurantTableAndOrderStatus(
+                        table,
+                        OrderStatus.PENDING
+                )
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "No pending order found for this table."
+                        )
+                );
+
+        // Find Dish
+        Dish dish = dishRepository
+                .findById(dishId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Dish not found."
+                        )
+                );
+
+        // Check Dish Active
+        if (!Boolean.TRUE.equals(dish.getIsActive())) {
+            throw new BadRequestException(
+                    dish.getDishName() + " is inactive."
+            );
+        }
+
+        // Only CHILD dishes can be ordered
+        if (dish.getDishType() != DishType.CHILD) {
+            throw new BadRequestException(
+                    dish.getDishName() + " cannot be ordered."
+            );
+        }
+
+        // Check if dish already exists in order
+        Optional<OrderItem> existingItem =
+                orderItemRepository.findByOrderAndDish(
+                        order,
+                        dish
+                );
+
+        if (existingItem.isPresent()) {
+
+            OrderItem orderItem = existingItem.get();
+
+            // Increase quantity
+            int newQuantity =
+                    orderItem.getQuantity() + 1;
+
+            orderItem.setQuantity(newQuantity);
+
+            // Recalculate item total
+            BigDecimal itemTotal =
+                    dish.getPrice()
+                            .multiply(
+                                    BigDecimal.valueOf(newQuantity)
+                            );
+
+            orderItem.setTotalPrice(itemTotal);
+
+            orderItem.setPrice(dish.getPrice());
+
+            orderItemRepository.save(orderItem);
+
+        } else {
+
+            // Dish doesn't exist in order
+            OrderItem orderItem = new OrderItem();
+
+            orderItem.setOrder(order);
+            orderItem.setDish(dish);
+            orderItem.setQuantity(1);
+            orderItem.setPrice(dish.getPrice());
+            orderItem.setTotalPrice(dish.getPrice());
+
+            orderItemRepository.save(orderItem);
+        }
+
+        // Recalculate Order Total
+        BigDecimal totalAmount =
+                order.getOrderItems()
+                        .stream()
+                        .map(OrderItem::getTotalPrice)
+                        .reduce(
+                                BigDecimal.ZERO,
+                                BigDecimal::add
+                        );
+
+        order.setTotalAmount(totalAmount);
+
+        // Since this is a pending order,
+        // discount is normally zero, but preserve it if present.
+        BigDecimal discount =
+                order.getDiscount() != null
+                        ? order.getDiscount()
+                        : BigDecimal.ZERO;
+
+        order.setFinalAmount(
+                totalAmount.subtract(discount)
+        );
+
+        Order savedOrder =
+                orderRepository.save(order);
+
+        return ResponseHandler.success(
+                "Dish quantity increased successfully.",
+                null
+        );
+    }
+
+    @Override
+    @Transactional
+    public ResponseEntity<ApiResponse<Object>> decreaseDishQuantity(
+            Integer tableId,
+            Integer dishId
+    ) {
+
+        RestaurantTable table = restaurantTableRepository
+                .findById(tableId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Table not found."
+                        )
+                );
+
+        if (!Boolean.TRUE.equals(table.getIsActive())) {
+            throw new BadRequestException(
+                    "Table is inactive."
+            );
+        }
+
+        Order order = orderRepository
+                .findByRestaurantTableAndOrderStatus(
+                        table,
+                        OrderStatus.PENDING
+                )
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "No pending order found for this table."
+                        )
+                );
+
+        Dish dish = dishRepository
+                .findById(dishId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Dish not found."
+                        )
+                );
+
+        OrderItem orderItem =
+                orderItemRepository
+                        .findByOrderAndDish(order, dish)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Dish is not present in this order."
+                                )
+                        );
+
+        int currentQuantity =
+                orderItem.getQuantity();
+
+        if (currentQuantity > 1) {
+
+            int newQuantity =
+                    currentQuantity - 1;
+
+            orderItem.setQuantity(newQuantity);
+
+            BigDecimal itemTotal =
+                    dish.getPrice()
+                            .multiply(
+                                    BigDecimal.valueOf(newQuantity)
+                            );
+
+            orderItem.setPrice(dish.getPrice());
+            orderItem.setTotalPrice(itemTotal);
+
+        } else {
+
+            order.getOrderItems().remove(orderItem);
+            orderItemRepository.delete(orderItem);
+        }
+
+        // Recalculate complete order amount
+        BigDecimal totalAmount =
+                order.getOrderItems()
+                        .stream()
+                        .map(OrderItem::getTotalPrice)
+                        .reduce(
+                                BigDecimal.ZERO,
+                                BigDecimal::add
+                        );
+
+        order.setTotalAmount(totalAmount);
+
+        BigDecimal discount =
+                order.getDiscount() != null
+                        ? order.getDiscount()
+                        : BigDecimal.ZERO;
+
+        order.setFinalAmount(
+                totalAmount.subtract(discount)
+        );
+
+        orderRepository.save(order);
+
+        return ResponseHandler.success(
+                "Dish quantity decreased successfully.",
+                null
+        );
+    }
+    @Override
+    @Transactional
+    public ResponseEntity<ApiResponse<Object>> removeDishFromOrder(
+            Integer tableId,
+            Integer dishId
+    ) {
+
+        // Find Table
+        RestaurantTable table = restaurantTableRepository
+                .findById(tableId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Table not found."
+                        )
+                );
+
+        // Check Table Active
+        if (!Boolean.TRUE.equals(table.getIsActive())) {
+            throw new BadRequestException(
+                    "Table is inactive."
+            );
+        }
+
+        // Find Pending Order
+        Order order = orderRepository
+                .findByRestaurantTableAndOrderStatus(
+                        table,
+                        OrderStatus.PENDING
+                )
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "No pending order found for this table."
+                        )
+                );
+
+        // Find Dish
+        Dish dish = dishRepository
+                .findById(dishId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Dish not found."
+                        )
+                );
+
+        // Find Order Item
+        OrderItem orderItem =
+                orderItemRepository
+                        .findByOrderAndDish(order, dish)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Dish is not present in this order."
+                                )
+                        );
+
+        // Remove the complete dish from the order
+        order.getOrderItems().remove(orderItem);
+
+        // Delete OrderItem from database
+        orderItemRepository.delete(orderItem);
+
+        // Recalculate Order Total
+        BigDecimal totalAmount =
+                order.getOrderItems()
+                        .stream()
+                        .map(OrderItem::getTotalPrice)
+                        .reduce(
+                                BigDecimal.ZERO,
+                                BigDecimal::add
+                        );
+
+        order.setTotalAmount(totalAmount);
+
+        // Recalculate Final Amount
+        BigDecimal discount =
+                order.getDiscount() != null
+                        ? order.getDiscount()
+                        : BigDecimal.ZERO;
+
+        order.setFinalAmount(
+                totalAmount.subtract(discount)
+        );
+
+        // Save Order
+        orderRepository.save(order);
+
+        return ResponseHandler.success(
+                "Dish removed from order successfully.",
+                null
+        );
     }
 
 

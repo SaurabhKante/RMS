@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import DashboardHeader from "../components/DashboardHeader";
 import { useAppContext } from "../context/AppContext";
+import { useNavigate, useParams } from "react-router-dom";
 
-import { useNavigate } from "react-router-dom";
 import {
   Plus,
   Minus,
@@ -27,22 +27,42 @@ const Dishes = () => {
     parentDishes,
     parentDishesLoading,
     fetchDishes,
+
     tables,
-    cartItems,
+    tablesLoading,
+    fetchTables,
+
+    // Active Table
     activeCartTableId,
     setActiveCartTableId,
+
+    // Pending Order
+    pendingOrder,
+    pendingOrderLoading,
+    fetchPendingOrder,
+
+    cartItems,
     addToCart,
     removeFromCart,
     adjustQuantity,
     clearCart,
+
     specialInstructions,
     setSpecialInstructions,
+
     discount,
     setDiscount,
+
     addOrderToTable,
+    addDishToTableOrder,
+    decreaseDishQuantity,
+    removeDishFromTableOrder,
     addTransaction,
     addDue,
   } = useAppContext();
+  const { tableId } = useParams();
+
+  const selectedTableId = tableId ? Number(tableId) : null;
   const Navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("All");
   const [menuSearch, setMenuSearch] = useState("");
@@ -56,8 +76,9 @@ const Dishes = () => {
   const [dueCustName, setDueCustName] = useState("");
   const [dueCustContact, setDueCustContact] = useState("");
 
-  const currentTable =
-    tables.find((t) => t.id === activeCartTableId) || tables[0];
+  const currentTable = tables.find(
+    (table) => Number(table.tableId) === Number(activeCartTableId),
+  );
 
   // Calculations
   const subtotal = cartItems.reduce(
@@ -72,13 +93,13 @@ const Dishes = () => {
 
   // Category Filtering
   const filteredDishes = dishes.filter((dish) => {
-  const searchTerm = menuSearch.toLowerCase();
+    const searchTerm = menuSearch.toLowerCase();
 
-  return (
-    dish.name.toLowerCase().includes(searchTerm) ||
-    dish.description.toLowerCase().includes(searchTerm)
-  );
-});
+    return (
+      dish.name.toLowerCase().includes(searchTerm) ||
+      dish.description.toLowerCase().includes(searchTerm)
+    );
+  });
 
   const handleSettleConfirm = () => {
     if (cartItems.length === 0) return;
@@ -130,6 +151,55 @@ const Dishes = () => {
       `Entire bill of ₹${finalTotal.toLocaleString("en-IN")} has been booked under ${dueCustName}'s due ledger. Table status updated.`,
     );
   };
+
+  useEffect(() => {
+    if (tablesLoading) return;
+
+    if (tables.length === 0) return;
+
+    // No tableId in URL -> select first table
+    if (!tableId) {
+      const firstTableId = tables[0].tableId;
+
+      setActiveCartTableId(firstTableId);
+
+      Navigate(`/dishes/${firstTableId}`, {
+        replace: true,
+      });
+
+      return;
+    }
+
+    // Table ID exists in URL
+    const currentTableId = Number(tableId);
+
+    const tableExists = tables.some(
+      (table) => Number(table.tableId) === currentTableId,
+    );
+
+    if (!tableExists) {
+      const firstTableId = tables[0].tableId;
+
+      setActiveCartTableId(firstTableId);
+
+      Navigate(`/dishes/${firstTableId}`, {
+        replace: true,
+      });
+
+      return;
+    }
+
+    setActiveCartTableId(currentTableId);
+  }, [tableId, tables, tablesLoading, Navigate, setActiveCartTableId]);
+
+  useEffect(() => {
+    if (!selectedTableId) return;
+
+    console.log("Fetching pending order for table:", selectedTableId);
+
+    fetchPendingOrder(selectedTableId);
+  }, [selectedTableId, fetchPendingOrder]);
+
   return (
     <>
       <DashboardHeader
@@ -149,33 +219,39 @@ const Dishes = () => {
               <div className="w-10 h-10 bg-[#0d5e65]/10 text-[#00454b] rounded-lg flex items-center justify-center">
                 <Users className="h-5 w-5" />
               </div>
+
               <div>
                 <h2 className="font-sans font-bold text-sm text-[#0b1c30]">
-                  Active Table: {currentTable?.name}
+                  Active Table: {currentTable?.tableName || "Loading..."}
                 </h2>
+
                 <p className="text-xs text-[#6f797a]">
-                  Select Table above to route bookings
+                  Capacity: {currentTable?.seatCapacity || 0} guests
                 </p>
               </div>
             </div>
 
-            {/* Selector to shift active table editing */}
             <div className="flex items-center gap-2">
               <span className="font-sans text-xs text-[#3f484a] font-medium">
-                Switch Session:
+                Switch Table:
               </span>
+
               <select
                 id="table-session-selector"
-                value={activeCartTableId}
+                value={activeCartTableId ?? ""}
                 onChange={(e) => {
-                  setActiveCartTableId(e.target.value);
-                  clearCart();
+                  const newTableId = Number(e.target.value);
+
+                  console.log("Switching to table:", newTableId);
+
+                  Navigate(`/dishes/${newTableId}`);
                 }}
+                disabled={tablesLoading}
                 className="bg-white border border-[#bfc8c9] rounded-md px-3 py-1.5 font-sans text-xs text-[#0b1c30] font-semibold outline-none focus:border-[#00454b]"
               >
-                {tables.map((tbl) => (
-                  <option key={tbl.id} value={tbl.id}>
-                    {tbl.name} ({tbl.status})
+                {tables.map((table) => (
+                  <option key={table.tableId} value={table.tableId}>
+                    {table.tableName}
                   </option>
                 ))}
               </select>
@@ -248,7 +324,7 @@ const Dishes = () => {
                     {/* Image Thumbnail */}
                     <div className="w-20 h-20 bg-[#eff4ff] border border-[#bfc8c9]/20 rounded-lg overflow-hidden shrink-0">
                       <img
-                        src={dish.image}
+                        src={dish.image || "..."}
                         alt={dish.name}
                         className="w-full h-full object-cover"
                         referrerPolicy="no-referrer"
@@ -294,9 +370,22 @@ const Dishes = () => {
                   {/* Quick Trigger Footer add button */}
                   <div className="p-3 bg-gray-50 border-t border-[#bfc8c9]/25 flex justify-end">
                     <button
-                      onClick={() => addToCart(dish)}
-                      disabled={!dish.isAvailable}
-                      className="p-1 px-3 bg-[#0d5e65]/10 hover:bg-[#00454b] hover:text-white rounded-md text-[#00454b] font-sans text-xs font-bold transition-all flex items-center gap-1"
+                      onClick={async () => {
+                        if (!selectedTableId) {
+                          alert("Please select a table first.");
+                          return;
+                        }
+
+                        console.log("Adding dish:", {
+                          tableId: selectedTableId,
+                          dishId: dish.id,
+                          dishName: dish.name,
+                        });
+
+                        await addDishToTableOrder(selectedTableId, dish.id);
+                      }}
+                      disabled={!dish.isAvailable || !selectedTableId}
+                      className="p-1 px-3 bg-[#0d5e65]/10 hover:bg-[#00454b] hover:text-white rounded-md text-[#00454b] font-sans text-xs font-bold transition-all flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       Add item
@@ -317,10 +406,16 @@ const Dishes = () => {
             <div className="flex items-center justify-between border-b border-[#bfc8c9]/35 pb-3">
               <div className="flex items-center gap-2">
                 <Receipt className="text-[#00454b] h-5 w-5" />
+
                 <h3 className="font-sans font-bold text-sm text-[#0b1c30]">
                   Current Order
                 </h3>
+
+                {pendingOrderLoading && (
+                  <span className="text-[10px] text-gray-500">Loading...</span>
+                )}
               </div>
+
               <button
                 onClick={clearCart}
                 className="text-xs text-[#ba1a1a] hover:underline font-bold"
@@ -360,29 +455,61 @@ const Dishes = () => {
                     {/* Quantity adjustment panel */}
                     <div className="flex items-center gap-2.5 bg-white p-1 rounded-lg border border-[#bfc8c9]/30 shrink-0">
                       <button
-                        onClick={() => adjustQuantity(item.dish.id, -1)}
-                        className="p-1 hover:bg-gray-100 rounded text-[#3f484a]"
-                      >
-                        <Minus className="h-3 w-3" />
-                      </button>
+  onClick={async () => {
+    if (!selectedTableId) {
+      alert("Please select a table first.");
+      return;
+    }
+
+    await adjustQuantity(
+      selectedTableId,
+      item.dish.id,
+      -1
+    );
+  }}
+  className="p-1 hover:bg-gray-100 rounded text-[#3f484a]"
+>
+  <Minus className="h-3 w-3" />
+</button>
                       <span className="font-mono text-xs font-bold text-[#0b1c30] w-4 text-center">
                         {item.quantity}
                       </span>
                       <button
-                        onClick={() => adjustQuantity(item.dish.id, 1)}
-                        className="p-1 hover:bg-gray-100 rounded text-[#3f484a]"
-                      >
-                        <Plus className="h-3 w-3" />
-                      </button>
+  onClick={async () => {
+    if (!selectedTableId) {
+      alert("Please select a table first.");
+      return;
+    }
+
+    await adjustQuantity(
+      selectedTableId,
+      item.dish.id,
+      1
+    );
+  }}
+  className="p-1 hover:bg-gray-100 rounded text-[#3f484a]"
+>
+  <Plus className="h-3 w-3" />
+</button>
                     </div>
 
                     {/* Delete */}
                     <button
-                      onClick={() => removeFromCart(item.dish.id)}
-                      className="p-1 text-red-500 hover:bg-red-50 rounded ml-1 transition-colors shrink-0"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+  onClick={async () => {
+    if (!selectedTableId) {
+      alert("Please select a table first.");
+      return;
+    }
+
+    await removeDishFromTableOrder(
+      selectedTableId,
+      item.dish.id
+    );
+  }}
+  className="p-1 text-red-500 hover:bg-red-50 rounded ml-1 transition-colors shrink-0"
+>
+  <Trash2 className="h-4 w-4" />
+</button>
                   </div>
                 ))
               )}

@@ -74,4 +74,51 @@ public class OrderController {
         return orderService.deletePendingOrder(tableId);
     }
 
+    @PostMapping("/add-dish/{tableId}/{dishId}")
+    public ResponseEntity<ApiResponse<Object>> addDishToOrder(
+            @PathVariable Integer tableId,
+            @PathVariable Integer dishId
+    ) {
+
+        return orderService.addDishToOrder(
+                tableId,
+                dishId
+        );
+    }
+
+    @PostMapping("/increase/{orderId}/{dishId}")
+    public ResponseEntity<ApiResponse<Object>> increaseDishQuantity(
+            @PathVariable Integer tableId,
+            @PathVariable Integer dishId
+    ) {
+
+        return orderService.increaseDishQuantity(
+                tableId,
+                dishId
+        );
+    }
+
+    @PostMapping("/decrease/{tableId}/{dishId}")
+    public ResponseEntity<ApiResponse<Object>> decreaseDishQuantity(
+            @PathVariable Integer tableId,
+            @PathVariable Integer dishId
+    ) {
+
+        return orderService.decreaseDishQuantity(
+                tableId,
+                dishId
+        );
+    }
+
+    @DeleteMapping("/remove-dish/{tableId}/{dishId}")
+    public ResponseEntity<ApiResponse<Object>> removeDishFromOrder(
+            @PathVariable Integer tableId,
+            @PathVariable Integer dishId
+    ) {
+
+        return orderService.removeDishFromOrder(
+                tableId,
+                dishId
+        );
+    }
 }

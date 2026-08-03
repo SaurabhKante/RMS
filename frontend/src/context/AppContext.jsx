@@ -1,102 +1,15 @@
-import React, { createContext, useState, useEffect, useContext } from "react";
+import React, {
+  createContext,
+  useState,
+  useEffect,
+  useContext,
+  useCallback,
+} from "react";
 import axios from "axios";
 import { BASE_URL } from "../constants/baseUrl";
 
 const AppContext = createContext(undefined);
 
-// Initial fallback data
-const initialTables = [
-  {
-    id: "t1",
-    name: "Table 01",
-    seats: 4,
-    status: "Occupied",
-    seatedTime: "45m seated",
-    totalAmount: 124.5,
-    itemsOrderCount: 6,
-    guestsAvatars: [
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuClNACxCt2z5muTZWa_xEMelJsdRqBnXWbF7eYkmlfTtZuTqZR0ozotVutcUtpEmiEmZrWY4LT_u8ZPDiu7Af3_fmooBjtUKbwkgpO2I5GSudsrjvHxy_GRajOPtFibLWRGBRnfoZHcXep_8ImycT5T5YPx-pe81KRfkUzkh5q2haU2_VtBqlPJ-gMFr_seuyjp1hpu9_YS_TmbxHZD2TmJqn-DbgarqP3ahHjkg7jZe9XFyhz4C4PyuIQ5ysG4lo2YHY1IWSNVaEc",
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuD4gzfwfUChcaKmgaGlQ4Jxtx2TRhuaBcroh-o66vP0qfFumdUZQxqFtmmbuGIR4DHz6M3MQh2h3Sf7lt68yiGzgM5s9433u-AeMT-UvoHRwBsJidOPQZ3YnjI558ZRg7UqT1N-dSXv47UXduWs7TYslyi4eMiynRqPA2bVi7rFl31tYe3FoHpeSU1R9UaeSyPWJi_ndpI6ESzjaMmtKQvQwULKAAqhfXu4wC0VAFOZ2UsCxtp2F8vAUTOIOkdGLigAIU8TZkgRsfo",
-    ],
-  },
-  {
-    id: "t2",
-    name: "Table 02",
-    seats: 2,
-    status: "Available",
-  },
-  {
-    id: "t5",
-    name: "Table 05",
-    seats: 6,
-    status: "Billing",
-    seatedTime: "1h 20m seated",
-    totalAmount: 342.1,
-    itemsOrderCount: 14,
-  },
-  {
-    id: "t8",
-    name: "Table 08",
-    seats: 4,
-    status: "Reserved",
-    reservedName: "Miller Party",
-    reservedTime: "7:30 PM (in 15m)",
-  },
-  {
-    id: "t3",
-    name: "Table 03",
-    seats: 2,
-    status: "Occupied",
-    seatedTime: "12m seated",
-    totalAmount: 42.0,
-    itemsOrderCount: 2,
-  },
-  {
-    id: "t11",
-    name: "Table 11",
-    seats: 4,
-    status: "Occupied",
-    seatedTime: "58m seated",
-    totalAmount: 186.0,
-    itemsOrderCount: 11,
-  },
-  {
-    id: "t4",
-    name: "Table 04",
-    seats: 4,
-    status: "Available",
-  },
-  {
-    id: "t6",
-    name: "Table 06",
-    seats: 6,
-    status: "Available",
-  },
-  {
-    id: "t7",
-    name: "Table 07",
-    seats: 2,
-    status: "Available",
-  },
-  {
-    id: "t9",
-    name: "Table 09",
-    seats: 4,
-    status: "Available",
-  },
-  {
-    id: "t10",
-    name: "Table 10",
-    seats: 2,
-    status: "Available",
-  },
-  {
-    id: "t12",
-    name: "Table 12",
-    seats: 8,
-    status: "Available",
-  },
-];
 
 const initialDues = [
   {
@@ -209,6 +122,18 @@ const mockUser = {
 
 // App Provider
 export const AppProvider = ({ children }) => {
+
+ const [tables, setTables] = useState([]);
+const [tablesLoading, setTablesLoading] = useState(false);
+
+const [activeCartTableId, setActiveCartTableId] = useState(null);
+
+const [cartItems, setCartItems] = useState([]);
+
+const [pendingOrder, setPendingOrder] = useState(null);
+const [pendingOrderLoading, setPendingOrderLoading] = useState(false);
+
+const [discount, setDiscount] = useState(0);
   
   // User / Authentication
   const [user, setUser] = useState(() => {
@@ -231,11 +156,44 @@ export const AppProvider = ({ children }) => {
   const [parentDishesLoading, setParentDishesLoading] = useState(false);
 
   
-  // Other State
-  const [tables, setTables] = useState(() => {
-    const saved = localStorage.getItem("hotelix_tables");
-    return saved ? JSON.parse(saved) : initialTables;
-  });
+const fetchTables = async () => {
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    console.error("Token is required to fetch tables.");
+    return;
+  }
+
+  try {
+    setTablesLoading(true);
+
+    const response = await axios.get(
+      `${BASE_URL}/table/v1/get-all`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const result = response.data;
+
+    if (result.success) {
+      setTables(result.data || []);
+    } else {
+      setTables([]);
+    }
+  } catch (error) {
+    console.error(
+      "Error fetching tables:",
+      error.response?.data || error.message
+    );
+
+    setTables([]);
+  } finally {
+    setTablesLoading(false);
+  }
+};
 
   const [dues, setDues] = useState(() => {
     const saved = localStorage.getItem("hotelix_dues");
@@ -252,17 +210,8 @@ export const AppProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : initialTransactions;
   });
 
-  
-  // Cart State
-  const [cartItems, setCartItems] = useState([]);
-
-  const [activeCartTableId, setActiveCartTableId] = useState("t1");
-
   const [specialInstructions, setSpecialInstructions] = useState("");
 
-  const [discount, setDiscount] = useState(0);
-
-  
   // Fetch Parent Dishes
   const token = localStorage.getItem("token");
 
@@ -304,8 +253,261 @@ const fetchParentDishes = async () => {
   }
 };
 
+const addDishToTableOrder = async (tableId, dishId) => {
+  if (!tableId || !dishId) {
+    console.error("tableId and dishId are required");
+    return false;
+  }
+
+  try {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      alert("Authentication token not found. Please login again.");
+      return false;
+    }
+
+    const response = await axios.post(
+      `${BASE_URL}/order/v1/add-dish/${tableId}/${dishId}`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const result = response.data;
+
+    console.log("Add Dish Response:", result);
+
+    if (result.success) {
+      // Backend response contains data: null.
+      // Fetch the updated order from backend.
+      await fetchPendingOrder(tableId);
+
+      return true;
+    }
+
+    alert(result.message || "Failed to add dish to order.");
+    return false;
+  } catch (error) {
+    console.error(
+      "Error adding dish to order:",
+      error.response?.data || error.message
+    );
+
+    if (error.response?.status === 401) {
+      alert("Session expired. Please login again.");
+    } else {
+      alert(
+        error.response?.data?.message ||
+          "Something went wrong while adding dish to order."
+      );
+    }
+
+    return false;
+  }
+};
+
+
+const decreaseDishQuantity = async (tableId, dishId) => {
+  if (!tableId || !dishId) {
+    console.error("tableId and dishId are required");
+    return false;
+  }
+
+  try {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      alert("Authentication token not found. Please login again.");
+      return false;
+    }
+
+    const response = await axios.post(
+      `${BASE_URL}/order/v1/decrease/${tableId}/${dishId}`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const result = response.data;
+
+    console.log("Decrease Dish Quantity Response:", result);
+
+    if (result.success) {
+      // Fetch latest order from backend
+      await fetchPendingOrder(tableId);
+
+      return true;
+    }
+
+    alert(result.message || "Failed to decrease dish quantity.");
+    return false;
+  } catch (error) {
+    console.error(
+      "Error decreasing dish quantity:",
+      error.response?.data || error.message
+    );
+
+    if (error.response?.status === 401) {
+      alert("Session expired. Please login again.");
+    } else {
+      alert(
+        error.response?.data?.message ||
+          "Something went wrong while decreasing dish quantity."
+      );
+    }
+
+    return false;
+  }
+};
+
+
+const removeDishFromTableOrder = async (tableId, dishId) => {
+  if (!tableId || !dishId) {
+    console.error("tableId and dishId are required");
+    return false;
+  }
+
+  try {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      alert("Authentication token not found. Please login again.");
+      return false;
+    }
+
+    const response = await axios.delete(
+      `${BASE_URL}/order/v1/remove-dish/${tableId}/${dishId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const result = response.data;
+
+    console.log("Remove Dish Response:", result);
+
+    if (result.success) {
+      // Fetch latest order from backend
+      await fetchPendingOrder(tableId);
+
+      return true;
+    }
+
+    alert(result.message || "Failed to remove dish from order.");
+    return false;
+  } catch (error) {
+    console.error(
+      "Error removing dish from order:",
+      error.response?.data || error.message
+    );
+
+    if (error.response?.status === 401) {
+      alert("Session expired. Please login again.");
+    } else {
+      alert(
+        error.response?.data?.message ||
+          "Something went wrong while removing dish from order."
+      );
+    }
+
+    return false;
+  }
+};
+
+const fetchPendingOrder = useCallback(async (tableId) => {
+  const token = localStorage.getItem("token");
+
+  if (!token || !tableId) {
+    return;
+  }
+
+  try {
+    setPendingOrderLoading(true);
+
+    const response = await axios.get(
+      `${BASE_URL}/order/v1/pending-order/${tableId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const result = response.data;
+
+    console.log(
+      `Pending order for table ${tableId}:`,
+      result
+    );
+
+    if (result.success && result.data) {
+      const order = result.data;
+
+      setPendingOrder(order);
+
+      const formattedCartItems = (order.orderItems || []).map(
+        (item) => ({
+          dish: {
+            id: item.dishId,
+            name: item.dishName,
+            price: Number(item.price) || 0,
+            description: "",
+            image: "",
+            tags: [],
+            category: "",
+            isAvailable: true,
+          },
+          quantity: item.quantity,
+        })
+      );
+
+      setCartItems(formattedCartItems);
+      setDiscount(Number(order.discount) || 0);
+    } else {
+      setPendingOrder(null);
+      setCartItems([]);
+      setDiscount(0);
+    }
+  } catch (error) {
+    console.error(
+      `Error fetching pending order for table ${tableId}:`,
+      error.response?.data || error.message
+    );
+
+    setPendingOrder(null);
+    setCartItems([]);
+    setDiscount(0);
+  } finally {
+    setPendingOrderLoading(false);
+  }
+}, []);
+
+useEffect(() => {
+  if (activeCartTableId !== null) {
+    console.log(
+      "Active table changed:",
+      activeCartTableId
+    );
+
+    fetchPendingOrder(activeCartTableId);
+  }
+}, [activeCartTableId]);
+
 useEffect(() => {
   fetchParentDishes();
+}, []);
+
+useEffect(() => {
+  fetchTables();
 }, []);
 
 
@@ -446,22 +648,22 @@ useEffect(() => {
     setCartItems((prev) => prev.filter((item) => item.dish.id !== dishId));
   };
 
-  const adjustQuantity = (dishId, change) => {
-    setCartItems((prev) => {
-      return prev.map((item) => {
-        if (item.dish.id === dishId) {
-          const nextQuantity = item.quantity + change;
+  const adjustQuantity = async (tableId, dishId, change) => {
+  if (!tableId || !dishId) {
+    console.error("tableId and dishId are required");
+    return false;
+  }
 
-          return {
-            ...item,
-            quantity: Math.max(1, nextQuantity),
-          };
-        }
+  if (change > 0) {
+    return await addDishToTableOrder(tableId, dishId);
+  }
 
-        return item;
-      });
-    });
-  };
+  if (change < 0) {
+    return await decreaseDishQuantity(tableId, dishId);
+  }
+
+  return false;
+};
 
   const clearCart = () => {
     setCartItems([]);
@@ -727,61 +929,72 @@ const deleteParentDish = async (parentDishId) => {
   // Context
   return (
     <AppContext.Provider
-      value={{
-        // User
-        user,
-        setUser,
-        isAuthenticated,
-        setIsAuthenticated,
+  value={{
+    // User
+    user,
+    setUser,
+    isAuthenticated,
+    setIsAuthenticated,
 
-        // Dishes API
-        dishes,
-        parentDishes,
-        dishesLoading,
-        parentDishesLoading,
-        fetchDishes,
+    // Tables
+    tables,
+    tablesLoading,
+    fetchTables,
 
-        // Tables
-        tables,
+    // Active Table
+    activeCartTableId,
+    setActiveCartTableId,
 
-        // Cart
-        cartItems,
-        activeCartTableId,
-        setActiveCartTableId,
-        addToCart,
-        removeFromCart,
-        adjustQuantity,
-        clearCart,
+    // Pending Order
+    pendingOrder,
+    pendingOrderLoading,
+    fetchPendingOrder,
 
-        // Billing
-        specialInstructions,
-        setSpecialInstructions,
-        discount,
-        setDiscount,
+    // Dishes API
+    dishes,
+    parentDishes,
+    dishesLoading,
+    parentDishesLoading,
+    fetchDishes,
 
-        // Orders
-        addOrderToTable,
+    // Cart
+    cartItems,
+    addToCart,
+    removeFromCart,
+    adjustQuantity,
+    clearCart,
 
-        // Dish management
-        addDish,
-        updateDish,
-        deleteDish,
-        toggleDishAvailability,
+    // Billing
+    specialInstructions,
+    setSpecialInstructions,
+     discount,
+    setDiscount,
 
-        // Other application data
-        dues,
-        setDues,
-        expenses,
-        setExpenses,
-        transactions,
-        setTransactions,
+    // Orders
+    addOrderToTable,
+addDishToTableOrder,
+decreaseDishQuantity,
+removeDishFromTableOrder,
 
-        updateParentDish,
+    // Dish management
+    addDish,
+    updateDish,
+    deleteDish,
+    toggleDishAvailability,
+    updateParentDish,
     deleteParentDish,
-      }}
-    >
-      {children}
-    </AppContext.Provider>
+
+    // Other application data
+    dues,
+    setDues,
+    expenses,
+    setExpenses,
+    transactions,
+    setTransactions,
+  }}
+>
+  {children}
+</AppContext.Provider>
   );
 };
 
