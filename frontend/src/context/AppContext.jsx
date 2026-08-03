@@ -725,6 +725,105 @@ useEffect(() => {
   }
 };
 
+const processPayment = async ({
+  tableId,
+  discount = 0,
+  payments,
+  dueDetails = null,
+}) => {
+  if (!tableId) {
+    alert("Table is required.");
+    return false;
+  }
+
+  if (!payments || payments.length === 0) {
+    alert("Please select a payment method.");
+    return false;
+  }
+
+  try {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      alert("Authentication token not found. Please login again.");
+      return false;
+    }
+
+    const payload = {
+      tableId: Number(tableId),
+      discount: Number(discount) || 0,
+
+      payments: payments.map((payment) => ({
+        paymentMethod: payment.paymentMethod,
+        amount: Number(payment.amount),
+
+        ...(payment.transactionId
+          ? {
+              transactionId: payment.transactionId,
+            }
+          : {}),
+      })),
+
+      ...(dueDetails
+        ? {
+            dueDetails: {
+              customerName: dueDetails.customerName,
+              mobileNumber: dueDetails.mobileNumber,
+            },
+          }
+        : {}),
+    };
+
+    console.log("Processing payment:", payload);
+
+    const response = await axios.post(
+      `${BASE_URL}/payment/v1/process-payment`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const result = response.data;
+
+    console.log("Payment Response:", result);
+
+    if (result.success) {
+      // Refresh pending order.
+      // Backend should now return no pending order because
+      // the order has been completed.
+      await fetchPendingOrder(tableId);
+
+      // Refresh tables so table status/amount is updated.
+      await fetchTables();
+
+      return result;
+    }
+
+    alert(result.message || "Payment processing failed.");
+    return false;
+  } catch (error) {
+    console.error(
+      "Process payment error:",
+      error.response?.data || error.message
+    );
+
+    if (error.response?.status === 401) {
+      alert("Session expired. Please login again.");
+    } else {
+      alert(
+        error.response?.data?.message ||
+          "Something went wrong while processing payment."
+      );
+    }
+
+    return false;
+  }
+};
+
   const updateDish = async (updatedDish) => {
   try {
 
@@ -975,6 +1074,7 @@ const deleteParentDish = async (parentDishId) => {
 addDishToTableOrder,
 decreaseDishQuantity,
 removeDishFromTableOrder,
+processPayment,
 
     // Dish management
     addDish,

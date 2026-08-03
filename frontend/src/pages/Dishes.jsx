@@ -57,8 +57,7 @@ const Dishes = () => {
     addDishToTableOrder,
     decreaseDishQuantity,
     removeDishFromTableOrder,
-    addTransaction,
-    addDue,
+    processPayment,
   } = useAppContext();
   const { tableId } = useParams();
 
@@ -67,14 +66,245 @@ const Dishes = () => {
   const [activeTab, setActiveTab] = useState("All");
   const [menuSearch, setMenuSearch] = useState("");
 
-  // Settle Modal state
-  const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
-  const [paymentMode, setPaymentMode] = useState("Card");
+  // Payment Modal
+const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
+const [transactionId, setTransactionId] = useState("");
 
-  // Alternative Due Booking Modal state inside settlement
-  const [isAddDueBooking, setIsAddDueBooking] = useState(false);
-  const [dueCustName, setDueCustName] = useState("");
-  const [dueCustContact, setDueCustContact] = useState("");
+// Payment mode
+const [paymentMode, setPaymentMode] = useState("CASH");
+
+// Split payments
+const [splitPayments, setSplitPayments] = useState([
+  {
+    paymentMethod: "CASH",
+    amount: "",
+    transactionId: "",
+  },
+]);
+
+// Due details
+const [dueCustName, setDueCustName] = useState("");
+const [dueCustContact, setDueCustContact] = useState("");
+
+// Payment processing
+const [paymentProcessing, setPaymentProcessing] = useState(false);
+
+const resetPaymentState = () => {
+  setPaymentMode("CASH");
+
+  setSplitPayments([
+    {
+      paymentMethod: "CASH",
+      amount: "",
+      transactionId: "",
+    },
+  ]);
+
+  setDueCustName("");
+  setDueCustContact("");
+  setPaymentProcessing(false);
+};
+
+const addSplitPayment = () => {
+  setSplitPayments((prev) => [
+    ...prev,
+    {
+      paymentMethod: "CASH",
+      amount: "",
+      transactionId: "",
+    },
+  ]);
+};
+
+const removeSplitPayment = (index) => {
+  setSplitPayments((prev) =>
+    prev.filter((_, i) => i !== index)
+  );
+};
+
+const updateSplitPayment = (index, field, value) => {
+  setSplitPayments((prev) =>
+    prev.map((payment, i) =>
+      i === index
+        ? {
+            ...payment,
+            [field]: value,
+          }
+        : payment
+    )
+  );
+};
+
+const handlePaymentSubmit = async () => {
+  if (!selectedTableId) {
+    alert("Please select a table.");
+    return;
+  }
+
+  if (cartItems.length === 0) {
+    alert("There are no items in the order.");
+    return;
+  }
+
+  const finalAmount = Number(finalTotal.toFixed(2));
+
+  let payments = [];
+  let dueDetails = null;
+
+  // ------------------------------------
+  // NORMAL PAYMENT
+  // ------------------------------------
+  if (paymentMode !== "SPLIT" && paymentMode !== "DUE") {
+    const method = paymentMode;
+
+    payments = [
+      {
+        paymentMethod: method,
+        amount: finalAmount,
+        ...(method === "UPI" || method === "CARD"
+          ? {
+              transactionId: "",
+            }
+          : {}),
+      },
+    ];
+  }
+
+  // ------------------------------------
+  // DUE PAYMENT
+  // ------------------------------------
+  if (paymentMode === "DUE") {
+    if (!dueCustName.trim()) {
+      alert("Customer name is required.");
+      return;
+    }
+
+    if (!dueCustContact.trim()) {
+      alert("Customer mobile number is required.");
+      return;
+    }
+
+    payments = [
+      {
+        paymentMethod: "DUE",
+        amount: finalAmount,
+      },
+    ];
+
+    dueDetails = {
+      customerName: dueCustName.trim(),
+      mobileNumber: dueCustContact.trim(),
+    };
+  }
+
+  // ------------------------------------
+  // SPLIT PAYMENT
+  // ------------------------------------
+  if (paymentMode === "SPLIT") {
+    const validPayments = splitPayments.filter(
+      (payment) => Number(payment.amount) > 0
+    );
+
+    if (validPayments.length === 0) {
+      alert("Please add at least one payment.");
+      return;
+    }
+
+    payments = validPayments.map((payment) => ({
+      paymentMethod: payment.paymentMethod,
+      amount: Number(payment.amount),
+
+      ...(payment.paymentMethod === "UPI" ||
+      payment.paymentMethod === "CARD"
+        ? {
+            transactionId: payment.transactionId?.trim() || "",
+          }
+        : {}),
+    }));
+
+    const totalPaid = payments.reduce(
+      (sum, payment) => sum + Number(payment.amount),
+      0
+    );
+
+    if (Math.abs(totalPaid - finalAmount) > 0.01) {
+      alert(
+        `Payment amount must equal ₹${finalAmount.toLocaleString(
+          "en-IN",
+          {
+            minimumFractionDigits: 2,
+          }
+        )}. Current payment total is ₹${totalPaid.toLocaleString(
+          "en-IN",
+          {
+            minimumFractionDigits: 2,
+          }
+        )}.`
+      );
+
+      return;
+    }
+
+    // If split payment contains DUE,
+    // collect customer details.
+    const hasDuePayment = payments.some(
+      (payment) => payment.paymentMethod === "DUE"
+    );
+
+    if (hasDuePayment) {
+      if (!dueCustName.trim()) {
+        alert("Customer name is required for Due payment.");
+        return;
+      }
+
+      if (!dueCustContact.trim()) {
+        alert("Customer mobile number is required for Due payment.");
+        return;
+      }
+
+      dueDetails = {
+        customerName: dueCustName.trim(),
+        mobileNumber: dueCustContact.trim(),
+      };
+    }
+  }
+
+  try {
+    setPaymentProcessing(true);
+
+    const result = await processPayment({
+      tableId: selectedTableId,
+      discount: Number(discount) || 0,
+      payments,
+      dueDetails,
+    });
+
+    if (!result || !result.success) {
+      return;
+    }
+
+    const paymentData = result.data;
+
+    // Close modal
+    setIsSettleModalOpen(false);
+
+    // Reset payment UI
+    resetPaymentState();
+
+    // Reset other local UI values
+    clearCart();
+
+    alert(
+      `Payment of ₹${Number(
+        paymentData.finalAmount
+      ).toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
+      })} processed successfully.`
+    );
+  } finally {
+    setPaymentProcessing(false);
+  }
+};
 
   const currentTable = tables.find(
     (table) => Number(table.tableId) === Number(activeCartTableId),
@@ -85,10 +315,10 @@ const Dishes = () => {
     (acc, item) => acc + item.dish.price * item.quantity,
     0,
   );
-  const taxPercent = 5; // CGST/SGST 5%
-  const taxAmount = parseFloat((subtotal * (taxPercent / 100)).toFixed(2));
+  // const taxPercent = 5; // CGST/SGST 5%
+  // const taxAmount = parseFloat((subtotal * (taxPercent / 100)).toFixed(2));
   const finalTotal = parseFloat(
-    Math.max(0, subtotal - discount + taxAmount).toFixed(2),
+    Math.max(0, subtotal - discount).toFixed(2),
   );
 
   // Category Filtering
@@ -555,12 +785,12 @@ const Dishes = () => {
                 />
               </div>
 
-              <div className="flex justify-between text-[#6f797a]">
+              {/* <div className="flex justify-between text-[#6f797a]">
                 <span>Tax (CGST & SGST 5%)</span>
                 <span className="font-mono">
                   ₹{taxAmount.toLocaleString("en-IN")}
                 </span>
-              </div>
+              </div> */}
 
               <div className="h-[1px] bg-[#bfc8c9]/25 my-1"></div>
 
@@ -594,179 +824,402 @@ const Dishes = () => {
 
       {/* Payment Settlement Modal Dialog */}
       {isSettleModalOpen && (
-        <div className="fixed inset-0 bg-[#0b1c30]/50 backdrop-blur-xs z-50 flex items-center justify-center">
-          <div className="bg-white w-full max-w-md p-6 rounded-xl shadow-xl border border-[#bfc8c9]/50 animate-in fade-in zoom-in-95">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="font-sans font-bold text-base text-[#0b1c30]">
-                Settle Payment — {currentTable?.name}
-              </h3>
-              <button
-                onClick={() => {
-                  setIsSettleModalOpen(false);
-                  setIsAddDueBooking(false);
-                }}
-                className="text-[#6f797a] hover:text-[#0b1c30]"
-              >
-                <X className="h-5 w-5" />
-              </button>
+  <div className="fixed inset-0 bg-[#0b1c30]/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div className="bg-white w-full max-w-md max-h-[90vh] overflow-y-auto p-6 rounded-xl shadow-xl border border-[#bfc8c9]/50">
+      
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h3 className="font-sans font-bold text-base text-[#0b1c30]">
+            Settle Payment
+          </h3>
+
+          <p className="text-xs text-gray-500 mt-1">
+            {currentTable?.tableName || "Current Table"}
+          </p>
+        </div>
+
+        <button
+          onClick={() => {
+            setIsSettleModalOpen(false);
+            resetPaymentState();
+          }}
+          className="text-[#6f797a] hover:text-[#0b1c30]"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* Amount Summary */}
+      <div className="bg-[#f8f9ff] p-4 rounded-xl border border-[#bfc8c9]/20 text-center mb-6">
+        <p className="text-xs text-[#6f797a] font-bold uppercase tracking-wider">
+          Amount Due
+        </p>
+
+        <h2 className="text-3xl font-extrabold text-[#00454b] mt-1 font-mono">
+          ₹
+          {finalTotal.toLocaleString("en-IN", {
+            minimumFractionDigits: 2,
+          })}
+        </h2>
+
+        {discount > 0 && (
+          <p className="text-xs text-green-600 mt-1">
+            Discount: ₹{Number(discount).toLocaleString("en-IN")}
+          </p>
+        )}
+      </div>
+
+      {/* Payment Methods */}
+      <div className="space-y-2">
+        <p className="font-sans text-xs font-bold text-[#6f797a] uppercase tracking-wide">
+          Select Payment Method
+        </p>
+
+        <div className="grid grid-cols-2 gap-3">
+
+          {/* CASH */}
+          <button
+            onClick={() => setPaymentMode("CASH")}
+            className={`p-4 rounded-lg border text-left flex flex-col justify-between transition-all h-20 ${
+              paymentMode === "CASH"
+                ? "border-2 border-[#00454b] bg-[#dce9ff]/20"
+                : "border-[#bfc8c9]/35 hover:bg-gray-50"
+            }`}
+          >
+            <Coins className="h-5 w-5 text-[#00454b]" />
+
+            <span className="font-sans text-xs font-bold text-[#0b1c30] mt-1">
+              Cash
+            </span>
+          </button>
+
+          {/* CARD */}
+          <button
+            onClick={() => setPaymentMode("CARD")}
+            className={`p-4 rounded-lg border text-left flex flex-col justify-between transition-all h-20 ${
+              paymentMode === "CARD"
+                ? "border-2 border-[#00454b] bg-[#dce9ff]/20"
+                : "border-[#bfc8c9]/35 hover:bg-gray-50"
+            }`}
+          >
+            <CreditCard className="h-5 w-5 text-[#00454b]" />
+
+            <span className="font-sans text-xs font-bold text-[#0b1c30] mt-1">
+              Card
+            </span>
+          </button>
+
+          {/* UPI */}
+          <button
+            onClick={() => setPaymentMode("UPI")}
+            className={`p-4 rounded-lg border text-left flex flex-col justify-between transition-all h-20 ${
+              paymentMode === "UPI"
+                ? "border-2 border-[#00454b] bg-[#dce9ff]/20"
+                : "border-[#bfc8c9]/35 hover:bg-gray-50"
+            }`}
+          >
+            <Smartphone className="h-5 w-5 text-[#00454b]" />
+
+            <span className="font-sans text-xs font-bold text-[#0b1c30] mt-1">
+              UPI
+            </span>
+          </button>
+
+          {/* SPLIT */}
+          <button
+            onClick={() => setPaymentMode("SPLIT")}
+            className={`p-4 rounded-lg border text-left flex flex-col justify-between transition-all h-20 ${
+              paymentMode === "SPLIT"
+                ? "border-2 border-[#00454b] bg-[#dce9ff]/20"
+                : "border-[#bfc8c9]/35 hover:bg-gray-50"
+            }`}
+          >
+            <Receipt className="h-5 w-5 text-[#00454b]" />
+
+            <span className="font-sans text-xs font-bold text-[#0b1c30] mt-1">
+              Split Bill
+            </span>
+          </button>
+
+          {/* DUE */}
+          <button
+            onClick={() => setPaymentMode("DUE")}
+            className={`p-4 rounded-lg border text-left flex flex-col justify-between transition-all h-20 col-span-2 ${
+              paymentMode === "DUE"
+                ? "border-2 border-[#9d4300] bg-orange-50"
+                : "border-[#bfc8c9]/35 hover:bg-gray-50"
+            }`}
+          >
+            <BookOpen className="h-5 w-5 text-[#9d4300]" />
+
+            <span className="font-sans text-xs font-bold text-[#0b1c30] mt-1">
+              Customer Due
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* -------------------------------- */}
+      {/* CARD / UPI TRANSACTION ID */}
+      {/* -------------------------------- */}
+
+      {(paymentMode === "CARD" ||
+        paymentMode === "UPI") && (
+        <div className="mt-5 space-y-2">
+          <label className="block text-xs font-bold text-[#6f797a] uppercase">
+            Transaction ID
+          </label>
+
+          <input
+            type="text"
+            value={splitPayments[0]?.transactionId || ""}
+            onChange={(e) => {
+              setSplitPayments([
+                {
+                  paymentMethod: paymentMode,
+                  amount: finalTotal,
+                  transactionId: e.target.value,
+                },
+              ]);
+            }}
+            placeholder="Enter transaction ID"
+            className="w-full px-3 py-2 bg-gray-50 border border-[#bfc8c9]/50 rounded-lg text-sm outline-none focus:bg-white"
+          />
+        </div>
+      )}
+
+      {/* -------------------------------- */}
+      {/* SPLIT PAYMENT SECTION */}
+      {/* -------------------------------- */}
+
+      {paymentMode === "SPLIT" && (
+        <div className="mt-5 space-y-4">
+
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-[#6f797a] uppercase">
+                Split Payments
+              </p>
+
+              <p className="text-[11px] text-gray-500 mt-1">
+                Total required: ₹
+                {finalTotal.toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                })}
+              </p>
             </div>
 
-            {!isAddDueBooking ? (
-              <div className="space-y-6">
-                {/* Summary of due */}
-                <div className="bg-[#f8f9ff] p-4 rounded-xl border border-[#bfc8c9]/20 text-center">
-                  <p className="text-xs text-[#6f797a] font-bold uppercase tracking-wider">
-                    Amount Due
-                  </p>
-                  <h2 className="text-3xl font-extrabold text-[#00454b] mt-1 font-mono">
-                    ₹
-                    {finalTotal.toLocaleString("en-IN", {
-                      minimumFractionDigits: 2,
-                    })}
-                  </h2>
-                </div>
+            <button
+              type="button"
+              onClick={addSplitPayment}
+              className="text-xs font-bold text-[#00454b] hover:underline"
+            >
+              + Add Payment
+            </button>
+          </div>
 
-                {/* Payment Methods Grid */}
-                <div className="space-y-2">
-                  <p className="font-sans text-xs font-bold text-[#6f797a] uppercase tracking-wide">
-                    Select Payment Method
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => setPaymentMode("Cash")}
-                      className={`p-4 rounded-lg border text-left flex flex-col justify-between transition-all h-20 ${
-                        paymentMode === "Cash"
-                          ? "border-2 border-[#00454b] bg-[#dce9ff]/20"
-                          : "border-[#bfc8c9]/35 hover:bg-gray-50"
-                      }`}
-                    >
-                      <Coins className="h-5 w-5 text-[#00454b]" />
-                      <span className="font-sans text-xs font-bold text-[#0b1c30] mt-1">
-                        Cash
-                      </span>
-                    </button>
+          {splitPayments.map((payment, index) => (
+            <div
+              key={index}
+              className="p-3 bg-gray-50 border border-[#bfc8c9]/40 rounded-lg space-y-3"
+            >
 
-                    <button
-                      onClick={() => setPaymentMode("Card")}
-                      className={`p-4 rounded-lg border text-left flex flex-col justify-between transition-all h-20 ${
-                        paymentMode === "Card"
-                          ? "border-2 border-[#00454b] bg-[#dce9ff]/20"
-                          : "border-[#bfc8c9]/35 hover:bg-gray-50"
-                      }`}
-                    >
-                      <CreditCard className="h-5 w-5 text-[#00454b]" />
-                      <span className="font-sans text-xs font-bold text-[#0b1c30] mt-1">
-                        Visa/Card
-                      </span>
-                    </button>
+              <div className="flex items-center gap-2">
 
-                    <button
-                      onClick={() => setPaymentMode("UPI")}
-                      className={`p-4 rounded-lg border text-left flex flex-col justify-between transition-all h-20 ${
-                        paymentMode === "UPI"
-                          ? "border-2 border-[#00454b] bg-[#dce9ff]/20"
-                          : "border-[#bfc8c9]/35 hover:bg-gray-50"
-                      }`}
-                    >
-                      <Smartphone className="h-5 w-5 text-[#00454b]" />
-                      <span className="font-sans text-xs font-bold text-[#0b1c30] mt-1">
-                        UPI (GPay/PhonePe)
-                      </span>
-                    </button>
+                {/* Payment Method */}
+                <select
+                  value={payment.paymentMethod}
+                  onChange={(e) =>
+                    updateSplitPayment(
+                      index,
+                      "paymentMethod",
+                      e.target.value
+                    )
+                  }
+                  className="flex-1 px-2 py-2 bg-white border border-[#bfc8c9] rounded-md text-xs outline-none"
+                >
+                  <option value="CASH">Cash</option>
+                  <option value="UPI">UPI</option>
+                  <option value="CARD">Card</option>
+                  <option value="DUE">Due</option>
+                </select>
 
-                    <button
-                      onClick={() => setPaymentMode("Split")}
-                      className={`p-4 rounded-lg border text-left flex flex-col justify-between transition-all h-20 ${
-                        paymentMode === "Split"
-                          ? "border-2 border-[#00454b] bg-[#dce9ff]/20"
-                          : "border-[#bfc8c9]/35 hover:bg-gray-50"
-                      }`}
-                    >
-                      <X className="h-5 w-5 text-[#00454b]" />
-                      <span className="font-sans text-xs font-bold text-[#0b1c30] mt-1">
-                        Split Bill
-                      </span>
-                    </button>
-                  </div>
-                </div>
+                {/* Amount */}
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={payment.amount}
+                  onChange={(e) =>
+                    updateSplitPayment(
+                      index,
+                      "amount",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Amount"
+                  className="w-28 px-2 py-2 bg-white border border-[#bfc8c9] rounded-md text-xs outline-none text-right"
+                />
 
-                <div className="h-[1px] bg-[#bfc8c9]/30"></div>
-
-                <div className="flex flex-col gap-3">
-                  <button
-                    onClick={handleSettleConfirm}
-                    className="w-full py-3 bg-[#0d5e65] text-white hover:bg-[#00454b] font-sans text-xs font-bold rounded-lg transition-all"
-                  >
-                    Confirm Payment
-                  </button>
-
-                  <button
-                    onClick={() => setIsAddDueBooking(true)}
-                    className="w-full py-3 border border-[#9d4300] text-[#9d4300] hover:bg-orange-50 font-sans text-xs font-bold rounded-lg transition-all"
-                  >
-                    Add to Customer Due / Account
-                  </button>
-                </div>
-              </div>
-            ) : (
-              /* Due Booking inner panel Form */
-              <form onSubmit={handleBookAsDue} className="space-y-4">
-                <div className="bg-orange-50 p-4 border border-orange-200 rounded-lg">
-                  <p className="text-xs text-orange-900 leading-normal">
-                    This will book the sum of{" "}
-                    <b>₹{finalTotal.toLocaleString("en-IN")}</b> directly into
-                    the Customer Dues ledger.
-                  </p>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-[#3f484a] uppercase">
-                    Customer Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. John Doe"
-                    value={dueCustName}
-                    onChange={(e) => setDueCustName(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-[#bfc8c9] rounded-lg text-sm outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-[#3f484a] uppercase">
-                    Contact Number
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="+91 99999 88888"
-                    value={dueCustContact}
-                    onChange={(e) => setDueCustContact(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-[#bfc8c9] rounded-lg text-sm outline-none font-mono"
-                  />
-                </div>
-
-                <div className="flex gap-3 pt-3">
+                {/* Remove */}
+                {splitPayments.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => setIsAddDueBooking(false)}
-                    className="flex-1 py-2 border border-[#bfc8c9] text-xs font-bold rounded-lg hover:bg-gray-50 text-[#3f484a]"
+                    onClick={() =>
+                      removeSplitPayment(index)
+                    }
+                    className="p-2 text-red-500 hover:bg-red-50 rounded"
                   >
-                    Back to Mode selection
+                    <Trash2 className="h-4 w-4" />
                   </button>
-                  <button
-                    type="submit"
-                    className="flex-1 py-2 bg-[#9d4300] text-white text-xs font-bold rounded-lg hover:bg-[#863c05]"
-                  >
-                    Book Due & Close Table
-                  </button>
+                )}
+              </div>
+
+              {/* Transaction ID */}
+              {(payment.paymentMethod === "UPI" ||
+                payment.paymentMethod === "CARD") && (
+                <input
+                  type="text"
+                  value={payment.transactionId}
+                  onChange={(e) =>
+                    updateSplitPayment(
+                      index,
+                      "transactionId",
+                      e.target.value
+                    )
+                  }
+                  placeholder="Transaction ID"
+                  className="w-full px-3 py-2 bg-white border border-[#bfc8c9] rounded-md text-xs outline-none"
+                />
+              )}
+
+              {/* Due customer details */}
+              {payment.paymentMethod === "DUE" && (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={dueCustName}
+                    onChange={(e) =>
+                      setDueCustName(e.target.value)
+                    }
+                    placeholder="Customer name"
+                    className="w-full px-3 py-2 bg-white border border-[#bfc8c9] rounded-md text-xs outline-none"
+                  />
+
+                  <input
+                    type="text"
+                    value={dueCustContact}
+                    onChange={(e) =>
+                      setDueCustContact(e.target.value)
+                    }
+                    placeholder="Customer mobile number"
+                    className="w-full px-3 py-2 bg-white border border-[#bfc8c9] rounded-md text-xs outline-none"
+                  />
                 </div>
-              </form>
-            )}
+              )}
+            </div>
+          ))}
+
+          {/* Split Total */}
+          <div className="flex justify-between items-center p-3 rounded-lg bg-[#00454b]/5 border border-[#00454b]/20">
+            <span className="text-xs font-bold text-[#3f484a]">
+              Split Total
+            </span>
+
+            <span
+              className={`text-sm font-bold ${
+                Math.abs(
+                  splitPayments.reduce(
+                    (sum, payment) =>
+                      sum + (Number(payment.amount) || 0),
+                    0
+                  ) - finalTotal
+                ) < 0.01
+                  ? "text-green-600"
+                  : "text-red-600"
+              }`}
+            >
+              ₹
+              {splitPayments
+                .reduce(
+                  (sum, payment) =>
+                    sum + (Number(payment.amount) || 0),
+                  0
+                )
+                .toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                })}
+            </span>
           </div>
         </div>
       )}
+
+      {/* -------------------------------- */}
+      {/* DUE CUSTOMER DETAILS */}
+      {/* -------------------------------- */}
+
+      {paymentMode === "DUE" && (
+        <div className="mt-5 p-4 bg-orange-50 border border-orange-200 rounded-lg space-y-3">
+
+          <p className="text-xs text-orange-900 font-bold">
+            Customer Due Details
+          </p>
+
+          <input
+            type="text"
+            value={dueCustName}
+            onChange={(e) =>
+              setDueCustName(e.target.value)
+            }
+            placeholder="Customer name"
+            className="w-full px-3 py-2 bg-white border border-orange-200 rounded-lg text-sm outline-none"
+          />
+
+          <input
+            type="text"
+            value={dueCustContact}
+            onChange={(e) =>
+              setDueCustContact(e.target.value)
+            }
+            placeholder="Customer mobile number"
+            className="w-full px-3 py-2 bg-white border border-orange-200 rounded-lg text-sm outline-none"
+          />
+        </div>
+      )}
+
+      {/* -------------------------------- */}
+      {/* ACTIONS */}
+      {/* -------------------------------- */}
+
+      <div className="h-[1px] bg-[#bfc8c9]/30 my-6"></div>
+
+      <div className="flex flex-col gap-3">
+
+        <button
+          onClick={handlePaymentSubmit}
+          disabled={paymentProcessing}
+          className="w-full py-3 bg-[#0d5e65] text-white hover:bg-[#00454b] font-sans text-xs font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {paymentProcessing
+            ? "Processing Payment..."
+            : "Confirm Payment"}
+        </button>
+
+        <button
+          onClick={() => {
+            setIsSettleModalOpen(false);
+            resetPaymentState();
+          }}
+          disabled={paymentProcessing}
+          className="w-full py-3 border border-[#bfc8c9] text-[#3f484a] hover:bg-gray-50 font-sans text-xs font-bold rounded-lg transition-all"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </>
   );
 };
