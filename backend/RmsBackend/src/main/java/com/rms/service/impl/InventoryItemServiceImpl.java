@@ -40,9 +40,6 @@ public class InventoryItemServiceImpl implements InventoryItemService {
     public ResponseEntity<ApiResponse<Object>> addInventoryItem(
             AddInventoryItemRequest request) {
 
-        if (inventoryItemRepository.existsByItemName(request.getItemName().trim())) {
-            throw new BadRequestException("Inventory Item already exists.");
-        }
 
         Vendor vendor = vendorRepository.findByVendorIdAndIsActiveTrue(request.getVendorId())
                 .orElseThrow(() ->
@@ -111,11 +108,7 @@ public class InventoryItemServiceImpl implements InventoryItemService {
 
                 cashExpenses = cashExpenses.add(item.getPrice());
 
-            } else if (item.getPaymentMethod() == PaymentMethod.DUE) {
-
-                dueExpenses = dueExpenses.add(item.getPrice());
-
-            } else if (item.getPaymentMethod() == PaymentMethod.UPI) {
+            } else if (item.getPaymentMethod() == PaymentMethod.UPI || item.getPaymentMethod() == PaymentMethod.CARD) {
 
                 onlineExpenses = onlineExpenses.add(item.getPrice());
 
@@ -146,20 +139,6 @@ public class InventoryItemServiceImpl implements InventoryItemService {
 
         InventoryItem item = getActiveInventoryItem(itemId);
 
-        // Update Item Name
-        if (request.getItemName() != null &&
-                !request.getItemName().trim().isEmpty()) {
-
-            if (inventoryItemRepository.existsByItemNameAndItemIdNot(
-                    request.getItemName().trim(),
-                    itemId)) {
-
-                throw new BadRequestException(
-                        "Inventory Item already exists.");
-            }
-
-            item.setItemName(request.getItemName().trim());
-        }
         if (request.getPrice() != null) {
             item.setPrice(request.getPrice());
         }

@@ -353,21 +353,6 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         
-        // Validate transaction ID
-        if (request.getPaymentMethod() == PaymentMethod.UPI
-                || request.getPaymentMethod() == PaymentMethod.CARD) {
-
-            if (request.getTransactionId() == null
-                    || request.getTransactionId().trim().isEmpty()) {
-
-                throw new BadRequestException(
-                        "Transaction Id is required for "
-                                + request.getPaymentMethod()
-                );
-            }
-        }
-
-        
         // Find pending customer due
         CustomerDue customerDue =
                 customerDueRepository.findPendingDue(

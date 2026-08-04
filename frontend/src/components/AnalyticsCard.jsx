@@ -23,10 +23,16 @@ const AnalyticsCard = ({
         transition-all
       `}
     >
-      <Icon className={`${iconColor} mb-3`} size={28} />
+      <Icon
+        className={`${iconColor} mb-3`}
+        size={28}
+      />
 
-      <h3 className={`text-3xl font-bold ${textColor}`}>
-        ₹ {amount}
+      <h3
+        className={`text-3xl font-bold ${textColor}`}
+      >
+        ₹{" "}
+        {Number(amount || 0).toLocaleString("en-IN")}
       </h3>
 
       <p className="uppercase text-xs tracking-wider text-gray-500 mt-2">
