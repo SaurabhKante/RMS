@@ -140,6 +140,25 @@
                 </configuration>
             </plugin>
 
+            <plugin>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-maven-plugin</artifactId>
+                <version>1.4</version> <!-- Compatible with springdoc-openapi v2 / Spring Boot 3 -->
+                <executions>
+                    <execution>
+                        <id>integration-test</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <outputDir>${project.basedir}</outputDir>
+                    <outputFileName>openapi.json</outputFileName>
+                </configuration>
+            </plugin>
+
+
         </plugins>
     </build>
 

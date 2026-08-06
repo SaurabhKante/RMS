@@ -1,0 +1,79 @@
+services:
+
+  mysql:
+    image: mysql:8.4
+    container_name: rms-mysql
+
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+    networks:
+      - rms-network
+
+    restart: unless-stopped
+
+
+  backend:
+    build:
+      context: ./backend/RmsBackend
+      dockerfile: Dockerfile
+
+    image: rms-backend
+    container_name: rms-backend
+
+    depends_on:
+      - mysql
+
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Kolkata
+
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USERNAME}
+
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+
+      JWT_SECRET: ${JWT_SECRET}
+
+      JWT_EXPIRATION: ${JWT_EXPIRATION}
+
+      ADMIN_FULL_NAME: ${ADMIN_FULL_NAME}
+      ADMIN_MOBILE_NO: ${ADMIN_MOBILE_NO}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+
+    networks:
+      - rms-network
+
+    restart: unless-stopped
+
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+
+    image: rms-frontend
+    container_name: rms-frontend
+
+    depends_on:
+      - backend
+
+    ports:
+      - "80:80"
+
+    networks:
+      - rms-network
+
+    restart: unless-stopped
+
+
+volumes:
+  mysql_data:
+
+
+networks:
+  rms-network:
+    driver: bridge

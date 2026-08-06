@@ -1,0 +1,32 @@
+# Maven
+target/
+.mvn/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Git
+.git/
+.gitignore
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.*
+
+# Local configuration
+application-local.properties
+application-dev.properties
+
+# Temporary files
+*.tmp
+*.temp

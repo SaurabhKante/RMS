@@ -12,16 +12,27 @@ import java.util.Optional;
 
 @Repository
 public interface DishRepository extends JpaRepository<Dish, Integer> {
-    Optional<Dish> findByDishIdAndIsActiveTrue(Integer dishId);
-    @Query("""
-    SELECT d
-    FROM Dish d
-    WHERE d.parentDish.dishId = :parentDishId
-      AND d.isActive = true
-      AND d.parentDish.isActive = true
-    ORDER BY d.dishName
-""")
-    List<Dish> findActiveChildren(@Param("parentDishId") Integer parentDishId);
-    List<Dish> findByDishTypeAndIsActiveTrue(DishType dishType);
 
+    Optional<Dish> findByDishIdAndIsActiveTrue(Integer dishId);
+
+    Optional<Dish> findByDishNameAndDishType(
+            String dishName,
+            DishType dishType
+    );
+
+    @Query("""
+        SELECT d
+        FROM Dish d
+        WHERE d.parentDish.dishId = :parentDishId
+          AND d.isActive = true
+          AND d.parentDish.isActive = true
+        ORDER BY d.dishName
+    """)
+    List<Dish> findActiveChildren(
+            @Param("parentDishId") Integer parentDishId
+    );
+
+    List<Dish> findByDishTypeAndIsActiveTrue(
+            DishType dishType
+    );
 }
