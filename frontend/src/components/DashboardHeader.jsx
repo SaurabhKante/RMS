@@ -4,6 +4,7 @@ import {
   Plus,
   User,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const DashboardHeader = ({
   searchPlaceholder = "Search...",
@@ -11,6 +12,9 @@ const DashboardHeader = ({
   onSearch,
   onButtonClick,
 }) => {
+
+  const navigate = useNavigate();
+
   return (
     <header className="flex items-center justify-between h-16 px-8 bg-white border-b border-gray-200 sticky top-0 z-30">
 
@@ -71,7 +75,7 @@ const DashboardHeader = ({
 
         {/* Profile */}
         <div className="w-9 h-9 rounded-full flex items-center justify-center overflow-hidden border border-gray-200">
-        <User size={20} />
+        <User size={20}  onClick={() => navigate('/profile')}/>
         </div>
 
       </div>

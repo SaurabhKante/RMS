@@ -395,15 +395,20 @@ const removeDishFromTableOrder = async (tableId, dishId) => {
 
     console.log("Remove Dish Response:", result);
 
-    if (result.success) {
-      // Fetch latest order from backend
-      await fetchPendingOrder(tableId);
-
-      return true;
+    if (!result.success) {
+      alert(result.message || "Failed to remove dish from order.");
+      return false;
     }
 
-    alert(result.message || "Failed to remove dish from order.");
-    return false;
+    /*
+     * Refresh the order after deleting the dish.
+     *
+     * fetchPendingOrder() will check whether
+     * any items are remaining.
+     */
+    await fetchPendingOrder(tableId);
+
+    return true;
   } catch (error) {
     console.error(
       "Error removing dish from order:",
@@ -936,6 +941,64 @@ const processPayment = async ({
   }
 };
 
+const deletePendingOrder = async (tableId) => {
+  if (!tableId) {
+    console.error("tableId is required");
+    return false;
+  }
+
+  try {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      alert("Authentication token not found. Please login again.");
+      return false;
+    }
+
+    const response = await axios.delete(
+      `${BASE_URL}/order/v1/delete-pending-order/${tableId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const result = response.data;
+
+    console.log("Delete Pending Order Response:", result);
+
+    if (result.success) {
+      // Clear frontend pending order state
+      setPendingOrder(null);
+      setCartItems([]);
+      setDiscount(0);
+      setSpecialInstructions("");
+
+      return true;
+    }
+
+    alert(result.message || "Failed to clear pending order.");
+    return false;
+  } catch (error) {
+    console.error(
+      "Delete pending order error:",
+      error.response?.data || error.message
+    );
+
+    if (error.response?.status === 401) {
+      alert("Session expired. Please login again.");
+    } else {
+      alert(
+        error.response?.data?.message ||
+          "Something went wrong while clearing the order."
+      );
+    }
+
+    return false;
+  }
+};
+
   const toggleDishAvailability = (id) => {
     setDishes((prev) =>
       prev.map((dish) =>
@@ -1055,6 +1118,7 @@ const deleteParentDish = async (parentDishId) => {
     dishesLoading,
     parentDishesLoading,
     fetchDishes,
+    fetchParentDishes,
 
     // Cart
     cartItems,
@@ -1071,6 +1135,7 @@ const deleteParentDish = async (parentDishId) => {
 
     // Orders
     addOrderToTable,
+    deletePendingOrder,
 addDishToTableOrder,
 decreaseDishQuantity,
 removeDishFromTableOrder,
