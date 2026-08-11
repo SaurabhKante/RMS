@@ -1,5 +1,8 @@
 services:
 
+  # =========================
+  # MYSQL DATABASE
+  # =========================
   mysql:
     image: mysql:8.4
     container_name: rms-mysql
@@ -17,6 +20,9 @@ services:
     restart: unless-stopped
 
 
+  # =========================
+  # SPRING BOOT BACKEND
+  # =========================
   backend:
     build:
       context: ./backend/RmsBackend
@@ -29,20 +35,54 @@ services:
       - mysql
 
     environment:
+
+      # -------------------------
+      # DATABASE
+      # -------------------------
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Kolkata
 
       SPRING_DATASOURCE_USERNAME: ${MYSQL_USERNAME}
 
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
 
+
+      # -------------------------
+      # JWT
+      # -------------------------
       JWT_SECRET: ${JWT_SECRET}
 
       JWT_EXPIRATION: ${JWT_EXPIRATION}
 
+
+      # -------------------------
+      # ADMIN USER
+      # -------------------------
       ADMIN_FULL_NAME: ${ADMIN_FULL_NAME}
+
       ADMIN_MOBILE_NO: ${ADMIN_MOBILE_NO}
+
       ADMIN_EMAIL: ${ADMIN_EMAIL}
+
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+
+
+      # -------------------------
+      # GROQ AI
+      # -------------------------
+      GROQ_API_TOKEN: ${GROQ_API_TOKEN}
+
+
+      # -------------------------
+      # AWS S3
+      # -------------------------
+      AWS_S3_ACCESS_KEY_ID: ${AWS_S3_ACCESS_KEY_ID}
+
+      AWS_S3_SECRET_ACCESS_KEY: ${AWS_S3_SECRET_ACCESS_KEY}
+
+      AWS_S3_REGION: ${AWS_S3_REGION}
+
+      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME}
+
 
     networks:
       - rms-network
@@ -50,6 +90,9 @@ services:
     restart: unless-stopped
 
 
+  # =========================
+  # REACT FRONTEND
+  # =========================
   frontend:
     build:
       context: ./frontend
@@ -70,10 +113,16 @@ services:
     restart: unless-stopped
 
 
+# =========================
+# VOLUMES
+# =========================
 volumes:
   mysql_data:
 
 
+# =========================
+# NETWORK
+# =========================
 networks:
   rms-network:
     driver: bridge

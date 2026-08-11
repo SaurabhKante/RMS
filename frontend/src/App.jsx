@@ -16,12 +16,17 @@ import AdminRoute from "./pages/AdminRoute";
 import Unauthorized from "./pages/Unauthorized";
 import UserManagement from "./pages/UserManagement";
 import UpdateProfile from "./pages/UpdateProfile";
+import AiWaiter from "./pages/AiWaiter";
+
 
 function App() {
   const location = useLocation();
 
   const hideSidebar =
-    location.pathname === "/login" || location.pathname === "/register";
+    location.pathname === "/login" ||
+    location.pathname === "/register" ||
+    location.pathname === "/ai-waiter";
+
 
   return (
     <div className="flex h-screen">
@@ -30,7 +35,9 @@ function App() {
       <div className="flex-1 flex flex-col">
         <main className="flex-1 bg-slate-50 overflow-auto">
           <Routes>
+            {/* Open routes — no JWT required */}
             <Route path="/login" element={<Login />} />
+            <Route path="/ai-waiter" element={<AiWaiter />} />
 
             <Route element={<ProtectedRoute />}>
               <Route path="/register" element={<Register />} />

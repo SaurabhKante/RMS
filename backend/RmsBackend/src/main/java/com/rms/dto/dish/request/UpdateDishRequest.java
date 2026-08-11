@@ -1,6 +1,8 @@
 package com.rms.dto.dish.request;
 
-import lombok.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 
@@ -21,5 +23,5 @@ public class UpdateDishRequest {
 
     private String tags;
 
-
+    private Integer parentDishId;
 }

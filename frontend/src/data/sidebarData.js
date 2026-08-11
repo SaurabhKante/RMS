@@ -10,7 +10,9 @@ import {
   FileText,
   Settings,
   LogOut,
+  Bot,
 } from "lucide-react";
+
 
 export const menuItems = [
   {
@@ -43,7 +45,13 @@ export const menuItems = [
     path: "/profile",
     icon: User,
   },
+  {
+    title: "AI Waiter",
+    path: "/ai-waiter",
+    icon: Bot,
+  },
 ];
+
 
 export const filterItems = [
   {

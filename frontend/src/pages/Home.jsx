@@ -105,21 +105,12 @@ const Home = () => {
 
   };
 
-
-  // ==============================
-  // INITIAL LOAD
-  // ==============================
-
   useEffect(() => {
 
     getTables();
 
   }, []);
 
-
-  // ==============================
-  // DELETE TABLE
-  // ==============================
 
   const handleDeleteTable = async (table) => {
 
@@ -171,10 +162,6 @@ const Home = () => {
   };
 
 
-  // ==============================
-  // EDIT TABLE
-  // ==============================
-
   const handleEditTable = (table) => {
 
     console.log(
@@ -184,11 +171,6 @@ const Home = () => {
 
     // Your edit modal can be opened here.
   };
-
-
-  // ==============================
-  // SEARCH
-  // ==============================
 
   const filteredTables = tablesList.filter(
     (table) => {

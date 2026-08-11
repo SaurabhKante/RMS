@@ -47,9 +47,10 @@ public class SecurityConfig {
 
                         // Authentication APIs
                         .requestMatchers(
-                                "/api/user/v1/login"
-
+                                "/api/user/v1/login",
+                                "/api/ai/v1/**"
                         ).permitAll()
+
 
                         // Swagger
                         .requestMatchers(

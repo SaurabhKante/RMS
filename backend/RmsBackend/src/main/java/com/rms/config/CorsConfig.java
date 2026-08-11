@@ -16,9 +16,12 @@ public class CorsConfig {
 
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // React frontend
-        configuration.setAllowedOrigins(
-                List.of("http://localhost:5173")
+        // Allow localhost and 127.0.0.1 origins
+        configuration.setAllowedOriginPatterns(
+                List.of("https://hotelix.online",
+                        "https://www.hotelix.online",
+                        "http://localhost:*",
+                        "http://127.0.0.1:*")
         );
 
         // HTTP methods
@@ -35,11 +38,7 @@ public class CorsConfig {
 
         // Request headers
         configuration.setAllowedHeaders(
-                List.of(
-                        "Authorization",
-                        "Content-Type",
-                        "Accept"
-                )
+                List.of("*")
         );
 
         // Allow Authorization header / cookies if required

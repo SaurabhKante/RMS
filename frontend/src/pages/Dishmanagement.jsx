@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useAppContext } from "../context/AppContext";
 import DashboardHeader from "../components/DashboardHeader";
 import { useNavigate } from "react-router-dom";
@@ -16,23 +16,29 @@ import {
   TrendingUp,
   Flame,
   ArrowLeft,
+  Upload,
+  ImageIcon,
+  Loader2,
 } from "lucide-react";
 
 export default function DishManagement() {
   const navigate = useNavigate();
   const {
-  dishes,
-  parentDishes,
-  parentDishesLoading,
-  dishesLoading,
-  fetchDishes,
-  addDish,
-  updateDish,
-  deleteDish,
-  toggleDishAvailability,
-  updateParentDish,
-  deleteParentDish,
-} = useAppContext();
+    dishes,
+    parentDishes,
+    parentDishesLoading,
+    dishesLoading,
+    fetchDishes,
+    addDish,
+    updateDish,
+    deleteDish,
+    toggleDishAvailability,
+    updateParentDish,
+    deleteParentDish,
+    uploadDishImage,
+  } = useAppContext();
+
+  const fileInputRef = useRef(null);
 
   const [activeCategoryFilter, setActiveCategoryFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -48,15 +54,20 @@ export default function DishManagement() {
   const [dishCategory, setDishCategory] = useState("");
   const [dishDescription, setDishDescription] = useState("");
   const [dishImageUrl, setDishImageUrl] = useState("");
-  const [dishTagsInput, setDishTagsInput] = useState(""); 
+  const [dishImageFile, setDishImageFile] = useState(null);   // raw File from picker
+  const [imagePreviewUrl, setImagePreviewUrl] = useState(""); // blob URL for thumbnail
+  const [imageUploadLoading, setImageUploadLoading] = useState(false);
+  const [dishTagsInput, setDishTagsInput] = useState("");
   const [editingCategory, setEditingCategory] = useState(null);
-const [categoryName, setCategoryName] = useState("");
-const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-const [categoryActionLoading, setCategoryActionLoading] = useState(false);
+  const [categoryName, setCategoryName] = useState("");
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [categoryActionLoading, setCategoryActionLoading] = useState(false);
 
   const handleAddDishSubmit = async (e) => {
     e.preventDefault();
+
     const priceVal = parseFloat(dishPrice);
+
     if (isNaN(priceVal) || priceVal <= 0) {
       alert("Please enter a valid positive price.");
       return;
@@ -64,55 +75,154 @@ const [categoryActionLoading, setCategoryActionLoading] = useState(false);
 
     const tagsArr = dishTagsInput
       ? dishTagsInput
-          .split(",")
-          .map((tag) => tag.trim())
-          .filter((tag) => tag !== "")
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter((tag) => tag !== "")
       : [];
 
-    const defaultImg =
-      dishImageUrl ||
-      "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=200";
+    let resolvedImageUrl = dishImageUrl;
+
+    if (dishImageFile) {
+      try {
+        setImageUploadLoading(true);
+
+        resolvedImageUrl = await uploadDishImage(
+          dishImageFile
+        );
+
+      } catch (uploadError) {
+
+        alert(
+          `Image upload failed: ${uploadError.message}`
+        );
+
+        setImageUploadLoading(false);
+        return;
+
+      } finally {
+
+        setImageUploadLoading(false);
+      }
+    }
+
+    if (!resolvedImageUrl) {
+
+      resolvedImageUrl =
+        "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=200";
+    }
+
+    const parentDishId = dishCategory
+      ? Number(dishCategory)
+      : null;
+
+    console.log(
+      "Selected Parent Dish ID:",
+      parentDishId
+    );
 
     if (editingDish) {
-  try {
-    await updateDish({
-      ...editingDish,
-      name: dishName,
-      price: priceVal,
-      category: dishCategory,
-      description: dishDescription,
-      image: defaultImg,
-      tags: tagsArr,
-    });
 
-    setEditingDish(null);
-  } catch (error) {
-    alert(error.message);
-    return;
-  }
-} else {
-  try {
-    await addDish({
-      name: dishName,
-      price: priceVal,
-      parentDishId: dishCategory,
-      description: dishDescription,
-      image: defaultImg,
-      tags: tagsArr,
-    });
-  } catch (error) {
-    alert(error.message);
-    return;
-  }
-}
+      try {
 
-    // Reset
+        const updatedDish = {
+          ...editingDish,
+
+          name: dishName,
+          price: priceVal,
+
+          // IMPORTANT
+          parentDishId: parentDishId,
+
+          description: dishDescription,
+          image: resolvedImageUrl,
+          tags: tagsArr,
+        };
+
+        console.log(
+          "Updating dish with:",
+          updatedDish
+        );
+
+        await updateDish(updatedDish);
+
+        setEditingDish(null);
+
+      } catch (error) {
+
+        console.error(
+          "Update dish error:",
+          error
+        );
+
+        alert(error.message);
+        return;
+      }
+
+    } else {
+
+      try {
+
+        const newDish = {
+          name: dishName,
+          price: priceVal,
+
+          // IMPORTANT
+          parentDishId: parentDishId,
+
+          description: dishDescription,
+          image: resolvedImageUrl,
+          tags: tagsArr,
+        };
+
+        console.log(
+          "Adding dish with:",
+          newDish
+        );
+
+        await addDish(newDish);
+
+      } catch (error) {
+
+        console.error(
+          "Add dish error:",
+          error
+        );
+
+        alert(error.message);
+        return;
+      }
+    }
+
+    resetForm();
+
+    setIsAddDishOpen(false);
+  };
+
+  /** Clears all form state including file picker and preview. */
+  const resetForm = () => {
     setDishName("");
     setDishPrice("");
     setDishDescription("");
     setDishImageUrl("");
     setDishTagsInput("");
-    setIsAddDishOpen(false);
+    setDishImageFile(null);
+    setImagePreviewUrl("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  /** Handles file picker change — creates a local blob preview URL. */
+  const handleImageFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Revoke previous blob URL to avoid memory leaks
+    if (imagePreviewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+
+    setDishImageFile(file);
+    setDishImageUrl(""); // clear manual URL when a file is chosen
+    setImagePreviewUrl(URL.createObjectURL(file));
   };
 
   const handleEditTrigger = (dish) => {
@@ -123,16 +233,15 @@ const [categoryActionLoading, setCategoryActionLoading] = useState(false);
     setDishDescription(dish.description);
     setDishImageUrl(dish.image);
     setDishTagsInput(dish.tags.join(", "));
+    // When editing, show existing image as preview (no file selected yet)
+    setDishImageFile(null);
+    setImagePreviewUrl(dish.image || "");
     setIsAddDishOpen(true);
   };
 
   const handleCancelForm = () => {
     setEditingDish(null);
-    setDishName("");
-    setDishPrice("");
-    setDishDescription("");
-    setDishImageUrl("");
-    setDishTagsInput("");
+    resetForm();
     setIsAddDishOpen(false);
   };
 
@@ -152,81 +261,81 @@ const [categoryActionLoading, setCategoryActionLoading] = useState(false);
     activeCategoryFilter === "All"
       ? "All Operational Dishes"
       : parentDishes.find(
-          (parent) => parent["Dish Id"] === activeCategoryFilter,
-        )?.["Dish Name"] || "Dishes";
+        (parent) => parent["Dish Id"] === activeCategoryFilter,
+      )?.["Dish Name"] || "Dishes";
 
 
-        const handleEditCategory = (parent) => {
-  setEditingCategory(parent);
-  setCategoryName(parent["Dish Name"]);
-  setIsCategoryModalOpen(true);
-};
+  const handleEditCategory = (parent) => {
+    setEditingCategory(parent);
+    setCategoryName(parent["Dish Name"]);
+    setIsCategoryModalOpen(true);
+  };
 
-const handleUpdateCategory = async (e) => {
-  e.preventDefault();
+  const handleUpdateCategory = async (e) => {
+    e.preventDefault();
 
-  const trimmedName = categoryName.trim();
+    const trimmedName = categoryName.trim();
 
-  if (!trimmedName) {
-    alert("Please enter a category name.");
-    return;
-  }
+    if (!trimmedName) {
+      alert("Please enter a category name.");
+      return;
+    }
 
-  if (trimmedName === editingCategory["Dish Name"]) {
-    setIsCategoryModalOpen(false);
-    return;
-  }
+    if (trimmedName === editingCategory["Dish Name"]) {
+      setIsCategoryModalOpen(false);
+      return;
+    }
 
-  try {
-    setCategoryActionLoading(true);
+    try {
+      setCategoryActionLoading(true);
 
-    await updateParentDish(
-      editingCategory["Dish Id"],
-      trimmedName
+      await updateParentDish(
+        editingCategory["Dish Id"],
+        trimmedName
+      );
+
+      setIsCategoryModalOpen(false);
+      setEditingCategory(null);
+      setCategoryName("");
+
+      // If the currently selected category was updated,
+      // keep it selected.
+      setActiveCategoryFilter(editingCategory["Dish Id"]);
+    } catch (error) {
+      alert(error.message || "Failed to update category.");
+    } finally {
+      setCategoryActionLoading(false);
+    }
+  };
+
+  const handleDeleteCategory = async (parent) => {
+    const parentId = parent["Dish Id"];
+    const parentName = parent["Dish Name"];
+
+    const confirmed = window.confirm(
+      `Delete "${parentName}" category?\n\nThis will also permanently delete all child dishes belonging to this category.`
     );
 
-    setIsCategoryModalOpen(false);
-    setEditingCategory(null);
-    setCategoryName("");
+    if (!confirmed) {
+      return;
+    }
 
-    // If the currently selected category was updated,
-    // keep it selected.
-    setActiveCategoryFilter(editingCategory["Dish Id"]);
-  } catch (error) {
-    alert(error.message || "Failed to update category.");
-  } finally {
-    setCategoryActionLoading(false);
-  }
-};
+    try {
+      setCategoryActionLoading(true);
 
-const handleDeleteCategory = async (parent) => {
-  const parentId = parent["Dish Id"];
-  const parentName = parent["Dish Name"];
+      await deleteParentDish(parentId);
 
-  const confirmed = window.confirm(
-    `Delete "${parentName}" category?\n\nThis will also permanently delete all child dishes belonging to this category.`
-  );
+      // After deletion, show All dishes
+      setActiveCategoryFilter("All");
 
-  if (!confirmed) {
-    return;
-  }
-
-  try {
-    setCategoryActionLoading(true);
-
-    await deleteParentDish(parentId);
-
-    // After deletion, show All dishes
-    setActiveCategoryFilter("All");
-
-    // fetchDishes() is already called inside deleteParentDish,
-    // so no need to call it again here.
-  } catch (error) {
-    alert(error.message || "Failed to delete category.");
-  } finally {
-    setCategoryActionLoading(false);
-  }
-};
+      // fetchDishes() is already called inside deleteParentDish,
+      // so no need to call it again here.
+    } catch (error) {
+      alert(error.message || "Failed to delete category.");
+    } finally {
+      setCategoryActionLoading(false);
+    }
+  };
 
   return (
     <div
@@ -256,70 +365,67 @@ const handleDeleteCategory = async (parent) => {
                   setActiveCategoryFilter("All");
                   fetchDishes();
                 }}
-                className={`w-full flex items-center justify-between p-2.5 rounded-lg font-sans text-xs font-semibold transition-colors ${
-                  activeCategoryFilter === "All"
-                    ? "bg-[#0d5e65]/10 text-[#0d5e65]"
-                    : "text-[#3f484a] hover:bg-gray-50"
-                }`}
+                className={`w-full flex items-center justify-between p-2.5 rounded-lg font-sans text-xs font-semibold transition-colors ${activeCategoryFilter === "All"
+                  ? "bg-[#0d5e65]/10 text-[#0d5e65]"
+                  : "text-[#3f484a] hover:bg-gray-50"
+                  }`}
               >
                 <span>All</span>
               </button>
 
               {/* Backend Parent Categories */}
               {parentDishes.map((parent) => {
-  const parentId = parent["Dish Id"];
-  const parentName = parent["Dish Name"];
+                const parentId = parent["Dish Id"];
+                const parentName = parent["Dish Name"];
 
-  return (
-    <div
-      key={parentId}
-      className={`flex items-center gap-1 rounded-lg transition-colors ${
-        activeCategoryFilter === parentId
-          ? "bg-[#0d5e65]/10"
-          : "hover:bg-gray-50"
-      }`}
-    >
-      {/* Category Select Button */}
-      <button
-        onClick={() => {
-          setActiveCategoryFilter(parentId);
-          fetchDishes(parentId);
-        }}
-        className={`flex-1 min-w-0 flex items-center p-2.5 rounded-lg font-sans text-xs font-semibold text-left transition-colors ${
-          activeCategoryFilter === parentId
-            ? "text-[#0d5e65]"
-            : "text-[#3f484a]"
-        }`}
-      >
-        <span className="truncate">
-          {parentName}
-        </span>
-      </button>
+                return (
+                  <div
+                    key={parentId}
+                    className={`flex items-center gap-1 rounded-lg transition-colors ${activeCategoryFilter === parentId
+                      ? "bg-[#0d5e65]/10"
+                      : "hover:bg-gray-50"
+                      }`}
+                  >
+                    {/* Category Select Button */}
+                    <button
+                      onClick={() => {
+                        setActiveCategoryFilter(parentId);
+                        fetchDishes(parentId);
+                      }}
+                      className={`flex-1 min-w-0 flex items-center p-2.5 rounded-lg font-sans text-xs font-semibold text-left transition-colors ${activeCategoryFilter === parentId
+                        ? "text-[#0d5e65]"
+                        : "text-[#3f484a]"
+                        }`}
+                    >
+                      <span className="truncate">
+                        {parentName}
+                      </span>
+                    </button>
 
-      {/* Edit Category */}
-      <button
-        type="button"
-        onClick={() => handleEditCategory(parent)}
-        disabled={categoryActionLoading}
-        className="p-2 text-[#6f797a] hover:text-[#00454b] hover:bg-white rounded-lg transition-colors"
-        title="Edit Category"
-      >
-        <Edit className="h-3.5 w-3.5" />
-      </button>
+                    {/* Edit Category */}
+                    <button
+                      type="button"
+                      onClick={() => handleEditCategory(parent)}
+                      disabled={categoryActionLoading}
+                      className="p-2 text-[#6f797a] hover:text-[#00454b] hover:bg-white rounded-lg transition-colors"
+                      title="Edit Category"
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                    </button>
 
-      {/* Delete Category */}
-      <button
-        type="button"
-        onClick={() => handleDeleteCategory(parent)}
-        disabled={categoryActionLoading}
-        className="p-2 text-[#6f797a] hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-        title="Delete Category"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
-    </div>
-  );
-})}
+                    {/* Delete Category */}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCategory(parent)}
+                      disabled={categoryActionLoading}
+                      className="p-2 text-[#6f797a] hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Delete Category"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -358,21 +464,19 @@ const handleDeleteCategory = async (parent) => {
             <div className="flex items-center gap-2 border border-[#bfc8c9]/35 rounded-lg p-1 bg-gray-50 shrink-0">
               <button
                 onClick={() => setViewMode("GRID")}
-                className={`p-1.5 rounded transition-all ${
-                  viewMode === "GRID"
-                    ? "bg-white shadow-xs text-[#00454b]"
-                    : "text-[#6f797a] hover:text-[#0b1c30]"
-                }`}
+                className={`p-1.5 rounded transition-all ${viewMode === "GRID"
+                  ? "bg-white shadow-xs text-[#00454b]"
+                  : "text-[#6f797a] hover:text-[#0b1c30]"
+                  }`}
               >
                 <LayoutGrid className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setViewMode("LIST")}
-                className={`p-1.5 rounded transition-all ${
-                  viewMode === "LIST"
-                    ? "bg-white shadow-xs text-[#00454b]"
-                    : "text-[#6f797a] hover:text-[#0b1c30]"
-                }`}
+                className={`p-1.5 rounded transition-all ${viewMode === "LIST"
+                  ? "bg-white shadow-xs text-[#00454b]"
+                  : "text-[#6f797a] hover:text-[#0b1c30]"
+                  }`}
               >
                 <List className="h-4 w-4" />
               </button>
@@ -386,9 +490,8 @@ const handleDeleteCategory = async (parent) => {
               {filteredDishes.map((dish) => (
                 <div
                   key={dish.id}
-                  className={`bg-white rounded-xl border overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow relative ${
-                    !dish.isAvailable ? "border-red-200" : "border-[#bfc8c9]/45"
-                  }`}
+                  className={`bg-white rounded-xl border overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow relative ${!dish.isAvailable ? "border-red-200" : "border-[#bfc8c9]/45"
+                    }`}
                 >
                   {!dish.isAvailable && (
                     <div className="absolute top-2 left-2 z-20">
@@ -401,7 +504,7 @@ const handleDeleteCategory = async (parent) => {
                   {/* Image space with overlay */}
                   <div className="h-40 bg-gray-100 border-b border-[#bfc8c9]/20 relative overflow-hidden">
                     <img
-                      src={dish.image}
+                      src={dish.image || "..."}
                       alt={dish.name}
                       className={`w-full h-full object-cover transition-all ${!dish.isAvailable ? "grayscale opacity-50" : ""}`}
                       referrerPolicy="no-referrer"
@@ -543,11 +646,10 @@ const handleDeleteCategory = async (parent) => {
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => toggleDishAvailability(dish.id)}
-                                className={`px-2.5 py-1 rounded text-[10px] font-extrabold uppercase ${
-                                  dish.isAvailable
-                                    ? "bg-green-100 text-[#2c613c]"
-                                    : "bg-red-100 text-red-800"
-                                }`}
+                                className={`px-2.5 py-1 rounded text-[10px] font-extrabold uppercase ${dish.isAvailable
+                                  ? "bg-green-100 text-[#2c613c]"
+                                  : "bg-red-100 text-red-800"
+                                  }`}
                               >
                                 {dish.isAvailable ? "Available" : "Sold out"}
                               </button>
@@ -661,14 +763,83 @@ const handleDeleteCategory = async (parent) => {
 
               <div className="space-y-1">
                 <label className="block text-xs font-semibold text-[#3f484a] uppercase">
-                  Image Url (Optional)
+                  Dish Image
                 </label>
+
+                {/* ── File picker drop zone ── */}
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="relative cursor-pointer w-full rounded-lg border-2 border-dashed border-[#bfc8c9] hover:border-[#00454b] bg-gray-50 hover:bg-[#f0fafa] transition-colors overflow-hidden"
+                >
+                  {imagePreviewUrl ? (
+                    /* Preview thumbnail */
+                    <div className="relative h-32">
+                      <img
+                        src={imagePreviewUrl}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                      {/* Overlay on hover */}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-1 text-white">
+                        <Upload className="h-4 w-4" />
+                        <span className="text-[11px] font-bold">Change Image</span>
+                      </div>
+                      {/* Clear button */}
+                      <button
+                        type="button"
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          setDishImageFile(null);
+                          setDishImageUrl("");
+                          setImagePreviewUrl("");
+                          if (fileInputRef.current) fileInputRef.current.value = "";
+                        }}
+                        className="absolute top-1.5 right-1.5 bg-white/90 hover:bg-white rounded-full p-0.5 shadow text-[#3f484a] hover:text-red-600 transition-colors"
+                        title="Remove image"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    /* Empty state */
+                    <div className="flex flex-col items-center justify-center gap-1.5 py-5 text-[#6f797a]">
+                      <ImageIcon className="h-7 w-7 opacity-50" />
+                      <p className="text-[11px] font-semibold">
+                        Click to upload from device
+                      </p>
+                      <p className="text-[10px] opacity-70">JPG, PNG, WEBP — max 10 MB</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Hidden native file input */}
                 <input
-                  placeholder="https://gourmet.link/image.jpg"
-                  value={dishImageUrl}
-                  onChange={(e) => setDishImageUrl(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-white border border-[#bfc8c9] rounded-lg text-xs outline-none"
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageFileChange}
                 />
+
+                {/* Optional manual URL fallback */}
+                {!dishImageFile && (
+                  <div className="mt-2">
+                    <p className="text-[10px] text-[#6f797a] mb-1">
+                      Or paste a URL instead:
+                    </p>
+                    <input
+                      type="url"
+                      placeholder="https://example.com/dish.jpg"
+                      value={dishImageUrl}
+                      onChange={(e) => {
+                        setDishImageUrl(e.target.value);
+                        setImagePreviewUrl(e.target.value);
+                      }}
+                      className="w-full px-3 py-1.5 bg-white border border-[#bfc8c9] rounded-lg text-xs outline-none focus:ring-1 focus:ring-[#00454b]"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -688,15 +859,24 @@ const handleDeleteCategory = async (parent) => {
                 <button
                   type="button"
                   onClick={handleCancelForm}
-                  className="flex-1 py-1.5 border border-[#bfc8c9] text-xs font-bold rounded-lg hover:bg-gray-50 text-[#3f484a]"
+                  disabled={imageUploadLoading}
+                  className="flex-1 py-1.5 border border-[#bfc8c9] text-xs font-bold rounded-lg hover:bg-gray-50 text-[#3f484a] disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-1.5 bg-[#00454b] text-white text-xs font-bold rounded-lg hover:bg-[#0d5e65]"
+                  disabled={imageUploadLoading}
+                  className="flex-1 py-1.5 bg-[#00454b] text-white text-xs font-bold rounded-lg hover:bg-[#0d5e65] disabled:opacity-60 flex items-center justify-center gap-1.5"
                 >
-                  {editingDish ? "Update Dish" : "Publish Dish"}
+                  {imageUploadLoading ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    editingDish ? "Update Dish" : "Publish Dish"
+                  )}
                 </button>
               </div>
             </form>
@@ -704,80 +884,80 @@ const handleDeleteCategory = async (parent) => {
         </div>
       )}
       {isCategoryModalOpen && editingCategory && (
-  <div className="fixed inset-0 bg-[#0b1c30]/50 backdrop-blur-xs z-50 flex items-center justify-center">
-    <div className="bg-white w-full max-w-sm p-6 rounded-xl shadow-xl border border-[#bfc8c9]/50">
-      
-      <div className="flex justify-between items-center mb-5">
-        <div>
-          <h3 className="font-sans font-bold text-base text-[#0b1c30]">
-            Update Category
-          </h3>
+        <div className="fixed inset-0 bg-[#0b1c30]/50 backdrop-blur-xs z-50 flex items-center justify-center">
+          <div className="bg-white w-full max-w-sm p-6 rounded-xl shadow-xl border border-[#bfc8c9]/50">
 
-          <p className="text-xs text-[#6f797a] mt-1">
-            Update the parent dish category name.
-          </p>
+            <div className="flex justify-between items-center mb-5">
+              <div>
+                <h3 className="font-sans font-bold text-base text-[#0b1c30]">
+                  Update Category
+                </h3>
+
+                <p className="text-xs text-[#6f797a] mt-1">
+                  Update the parent dish category name.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCategoryModalOpen(false);
+                  setEditingCategory(null);
+                  setCategoryName("");
+                }}
+                className="text-[#6f797a] hover:text-[#0b1c30]"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleUpdateCategory}
+              className="space-y-4"
+            >
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-[#3f484a] uppercase">
+                  Category Name
+                </label>
+
+                <input
+                  type="text"
+                  required
+                  value={categoryName}
+                  onChange={(e) => setCategoryName(e.target.value)}
+                  placeholder="Enter category name"
+                  className="w-full px-3 py-2 bg-white border border-[#bfc8c9] rounded-lg text-xs outline-none focus:ring-2 focus:ring-[#00454b]/20 focus:border-[#00454b]"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={categoryActionLoading}
+                  onClick={() => {
+                    setIsCategoryModalOpen(false);
+                    setEditingCategory(null);
+                    setCategoryName("");
+                  }}
+                  className="flex-1 py-2 border border-[#bfc8c9] text-xs font-bold rounded-lg hover:bg-gray-50 text-[#3f484a] disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={categoryActionLoading}
+                  className="flex-1 py-2 bg-[#00454b] text-white text-xs font-bold rounded-lg hover:bg-[#0d5e65] disabled:opacity-50"
+                >
+                  {categoryActionLoading
+                    ? "Updating..."
+                    : "Update Category"}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            setIsCategoryModalOpen(false);
-            setEditingCategory(null);
-            setCategoryName("");
-          }}
-          className="text-[#6f797a] hover:text-[#0b1c30]"
-        >
-          <X className="h-5 w-5" />
-        </button>
-      </div>
-
-      <form
-        onSubmit={handleUpdateCategory}
-        className="space-y-4"
-      >
-        <div className="space-y-1">
-          <label className="block text-xs font-semibold text-[#3f484a] uppercase">
-            Category Name
-          </label>
-
-          <input
-            type="text"
-            required
-            value={categoryName}
-            onChange={(e) => setCategoryName(e.target.value)}
-            placeholder="Enter category name"
-            className="w-full px-3 py-2 bg-white border border-[#bfc8c9] rounded-lg text-xs outline-none focus:ring-2 focus:ring-[#00454b]/20 focus:border-[#00454b]"
-          />
-        </div>
-
-        <div className="flex gap-3 pt-2">
-          <button
-            type="button"
-            disabled={categoryActionLoading}
-            onClick={() => {
-              setIsCategoryModalOpen(false);
-              setEditingCategory(null);
-              setCategoryName("");
-            }}
-            className="flex-1 py-2 border border-[#bfc8c9] text-xs font-bold rounded-lg hover:bg-gray-50 text-[#3f484a] disabled:opacity-50"
-          >
-            Cancel
-          </button>
-
-          <button
-            type="submit"
-            disabled={categoryActionLoading}
-            className="flex-1 py-2 bg-[#00454b] text-white text-xs font-bold rounded-lg hover:bg-[#0d5e65] disabled:opacity-50"
-          >
-            {categoryActionLoading
-              ? "Updating..."
-              : "Update Category"}
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-)}
+      )}
     </div>
   );
 }

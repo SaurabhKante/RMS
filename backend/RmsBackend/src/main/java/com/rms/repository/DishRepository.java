@@ -15,6 +15,11 @@ public interface DishRepository extends JpaRepository<Dish, Integer> {
 
     Optional<Dish> findByDishIdAndIsActiveTrue(Integer dishId);
 
+    Optional<Dish> findByDishIdAndDishTypeAndIsActiveTrue(
+            Integer dishId,
+            DishType dishType
+    );
+
     Optional<Dish> findByDishNameAndDishType(
             String dishName,
             DishType dishType
@@ -35,4 +40,5 @@ public interface DishRepository extends JpaRepository<Dish, Integer> {
     List<Dish> findByDishTypeAndIsActiveTrue(
             DishType dishType
     );
+
 }

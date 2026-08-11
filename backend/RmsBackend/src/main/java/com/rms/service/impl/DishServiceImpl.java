@@ -178,36 +178,95 @@ public class DishServiceImpl implements DishService {
     }
     @Transactional
     @Override
-    public ResponseEntity<ApiResponse<Object>> updateChildDish(UpdateDishRequest dish) {
-        Dish newDish = dishRepository.findByDishIdAndIsActiveTrue(dish.getDishId())
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Child dish not available to update"));
+    public ResponseEntity<ApiResponse<Object>> updateChildDish(
+            UpdateDishRequest dish
+    ) {
 
-        if (dish.getDishName() != null && !dish.getDishName().trim().isEmpty()) {
-            newDish.setDishName(dish.getDishName().trim());
+        Dish existingDish = dishRepository
+                .findByDishIdAndIsActiveTrue(dish.getDishId())
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Dish not available to update"
+                        )
+                );
+
+        if (existingDish.getDishType() != DishType.CHILD) {
+
+            throw new IllegalArgumentException(
+                    "Only child dishes can be updated using this API"
+            );
+        }
+
+        if (dish.getDishName() != null
+                && !dish.getDishName().trim().isEmpty()) {
+
+            existingDish.setDishName(
+                    dish.getDishName().trim()
+            );
         }
 
         if (dish.getDescription() != null) {
-            newDish.setDescription(dish.getDescription().trim());
+
+            existingDish.setDescription(
+                    dish.getDescription().trim()
+            );
         }
 
         if (dish.getPrice() != null) {
-            newDish.setPrice(dish.getPrice());
+
+            existingDish.setPrice(
+                    dish.getPrice()
+            );
         }
 
-        if (dish.getImageUrl() != null && !dish.getImageUrl().trim().isEmpty()) {
-            newDish.setImageUrl(dish.getImageUrl().trim());
+        if (dish.getImageUrl() != null) {
+
+            existingDish.setImageUrl(
+                    dish.getImageUrl().trim()
+            );
         }
 
         if (dish.getTags() != null) {
-            newDish.setTags(dish.getTags().trim());
+
+            existingDish.setTags(
+                    dish.getTags().trim()
+            );
         }
 
-         dishRepository.save(newDish);
-         return ResponseHandler.updated(
-                 "Child dish updated.",
-                 convertDishToUpdateDish(newDish)
-         );
+        if (dish.getParentDishId() != null) {
+
+            System.out.println(
+                    "Received parentDishId: "
+                            + dish.getParentDishId()
+            );
+
+            Dish parentDish = dishRepository
+                    .findByDishIdAndDishTypeAndIsActiveTrue(
+                            dish.getParentDishId(),
+                            DishType.PARENT
+                    )
+                    .orElseThrow(() ->
+                            new ResourceNotFoundException(
+                                    "Parent dish category not found with ID: "
+                                            + dish.getParentDishId()
+                            )
+                    );
+
+            System.out.println(
+                    "Parent category found: "
+                            + parentDish.getDishName()
+            );
+
+            existingDish.setParentDish(parentDish);
+        }
+
+        Dish updatedDish = dishRepository.save(existingDish);
+
+
+        return ResponseHandler.updated(
+                "Child dish updated successfully.",
+                convertDishToUpdateDish(updatedDish)
+        );
     }
 
     @Override
