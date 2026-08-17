@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import DashboardHeader from "../components/DashboardHeader";
 import { useAppContext } from "../context/AppContext";
 import { useNavigate, useParams } from "react-router-dom";
+import { BILL_SERVICE_URL } from "../constants/baseUrl";
 
 import {
   Plus,
@@ -16,6 +17,8 @@ import {
   Users,
   BookOpen,
   X,
+  Printer,
+  CheckCircle2,
 } from "lucide-react";
 
 const Dishes = () => {
@@ -88,6 +91,12 @@ const Dishes = () => {
 
   // Payment processing
   const [paymentProcessing, setPaymentProcessing] = useState(false);
+
+  // Bill printing state
+  const [lastPaidOrderId, setLastPaidOrderId] = useState(null);
+  const [isLastPaymentFullyPaid, setIsLastPaymentFullyPaid] = useState(false);
+  const [billLoading, setBillLoading] = useState(false);
+  const [showBillSuccess, setShowBillSuccess] = useState(false);
 
   const selectedTableId = tableId ? Number(tableId) : null;
 
@@ -492,8 +501,7 @@ const Dishes = () => {
         return;
       }
 
-      const paymentData =
-        result.data;
+      const paymentData = result.data;
 
       // Close modal
       setIsSettleModalOpen(false);
@@ -504,12 +512,27 @@ const Dishes = () => {
       // Clear cart
       clearCart();
 
+      // Track the completed order for bill printing.
+      // A bill can only be printed when there is NO pending due.
+      // dueDetails is null when fully paid; it has dueStatus=PENDING when due exists.
+      const fullyPaid =
+        !paymentData.dueDetails ||
+        paymentData.dueDetails.dueStatus !== "PENDING";
+
+      setLastPaidOrderId(paymentData.orderId);
+      setIsLastPaymentFullyPaid(fullyPaid);
+      setShowBillSuccess(true);
+
       alert(
         `Payment of ₹${Number(
           paymentData.finalAmount
         ).toLocaleString("en-IN", {
           minimumFractionDigits: 2,
-        })} processed successfully.`
+        })} processed successfully.${
+          fullyPaid
+            ? " You can now print the bill."
+            : " A due has been recorded."
+        }`
       );
     } catch (error) {
       console.error(
@@ -522,6 +545,53 @@ const Dishes = () => {
       );
     } finally {
       setPaymentProcessing(false);
+    }
+  };
+
+  const handlePrintBill = async () => {
+    if (!lastPaidOrderId) {
+      return;
+    }
+
+    try {
+      setBillLoading(true);
+
+      const url = `${BILL_SERVICE_URL}/bill/v1/generate/${lastPaidOrderId}`;
+
+      // Fetch the PDF as a blob and trigger browser download.
+      const response = await fetch(url, { method: "GET" });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        alert(
+          errorData.detail ||
+          "Failed to generate the bill. Please try again."
+        );
+        return;
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+
+      // Open in a new tab so the browser's PDF viewer handles it
+      // (user can then print or save from the viewer).
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = `bill_order_${lastPaidOrderId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(objectUrl);
+
+      // Hide the success banner after downloading
+      setShowBillSuccess(false);
+      setLastPaidOrderId(null);
+      setIsLastPaymentFullyPaid(false);
+    } catch (error) {
+      console.error("Bill generation error:", error);
+      alert("Could not connect to bill service. Please check if it is running.");
+    } finally {
+      setBillLoading(false);
     }
   };
 
@@ -659,6 +729,50 @@ const Dishes = () => {
           navigate("/dishes/manage")
         }
       />
+
+      {/* ── Print Bill Banner ─────────────────────────────── */}
+      {showBillSuccess && isLastPaymentFullyPaid && lastPaidOrderId && (
+        <div className="mx-6 mt-4 flex items-center justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 shadow-sm">
+          <div className="flex items-center gap-3">
+            <CheckCircle2
+              size={20}
+              className="shrink-0 text-emerald-600"
+            />
+            <div>
+              <p className="text-sm font-semibold text-emerald-800">
+                Payment Complete — Order #{lastPaidOrderId}
+              </p>
+              <p className="text-xs text-emerald-600">
+                Click "Print Bill" to download the PDF receipt.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              id="print-bill-btn"
+              onClick={handlePrintBill}
+              disabled={billLoading}
+              className="flex items-center gap-1.5 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-semibold text-white shadow transition hover:bg-emerald-800 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Printer size={14} />
+              {billLoading ? "Generating..." : "Print Bill"}
+            </button>
+
+            <button
+              id="dismiss-bill-banner-btn"
+              onClick={() => {
+                setShowBillSuccess(false);
+                setLastPaidOrderId(null);
+                setIsLastPaymentFullyPaid(false);
+              }}
+              className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex-grow flex flex-col xl:flex-row overflow-hidden">
 

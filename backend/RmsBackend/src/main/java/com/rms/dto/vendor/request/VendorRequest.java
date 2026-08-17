@@ -8,7 +8,7 @@ import lombok.Setter;
 @Setter
 public class VendorRequest {
 
-    @NotBlank(message = "Vendor name is required")
+    @NotBlank(message = "vendorName is required")
     private String vendorName;
 
 }

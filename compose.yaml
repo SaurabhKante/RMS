@@ -1,8 +1,9 @@
 services:
 
-  # =========================
+  # =========================================================
   # MYSQL DATABASE
-  # =========================
+  # =========================================================
+
   mysql:
     image: mysql:8.4
     container_name: rms-mysql
@@ -20,9 +21,10 @@ services:
     restart: unless-stopped
 
 
-  # =========================
+  # =========================================================
   # SPRING BOOT BACKEND
-  # =========================
+  # =========================================================
+
   backend:
     build:
       context: ./backend/RmsBackend
@@ -34,11 +36,15 @@ services:
     depends_on:
       - mysql
 
+    ports:
+      - "127.0.0.1:8080:8080"
+
     environment:
 
-      # -------------------------
+      # -----------------------------------------------------
       # DATABASE
-      # -------------------------
+      # -----------------------------------------------------
+
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Kolkata
 
       SPRING_DATASOURCE_USERNAME: ${MYSQL_USERNAME}
@@ -46,17 +52,19 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
 
 
-      # -------------------------
+      # -----------------------------------------------------
       # JWT
-      # -------------------------
+      # -----------------------------------------------------
+
       JWT_SECRET: ${JWT_SECRET}
 
       JWT_EXPIRATION: ${JWT_EXPIRATION}
 
 
-      # -------------------------
+      # -----------------------------------------------------
       # ADMIN USER
-      # -------------------------
+      # -----------------------------------------------------
+
       ADMIN_FULL_NAME: ${ADMIN_FULL_NAME}
 
       ADMIN_MOBILE_NO: ${ADMIN_MOBILE_NO}
@@ -66,15 +74,17 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
 
 
-      # -------------------------
+      # -----------------------------------------------------
       # GROQ AI
-      # -------------------------
+      # -----------------------------------------------------
+
       GROQ_API_TOKEN: ${GROQ_API_TOKEN}
 
 
-      # -------------------------
+      # -----------------------------------------------------
       # AWS S3
-      # -------------------------
+      # -----------------------------------------------------
+
       AWS_S3_ACCESS_KEY_ID: ${AWS_S3_ACCESS_KEY_ID}
 
       AWS_S3_SECRET_ACCESS_KEY: ${AWS_S3_SECRET_ACCESS_KEY}
@@ -83,6 +93,51 @@ services:
 
       AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME}
 
+    networks:
+      - rms-network
+
+    restart: unless-stopped
+
+
+  # =========================================================
+  # PYTHON BILL MICROSERVICE
+  # =========================================================
+
+  bill-service:
+    build:
+      context: ./bill-service
+      dockerfile: Dockerfile
+
+    image: rms-bill-service
+    container_name: rms-bill-service
+
+    depends_on:
+      - mysql
+
+    env_file:
+      - ./bill-service/.env
+
+    environment:
+
+      # -----------------------------------------------------
+      # DATABASE
+      # -----------------------------------------------------
+
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USERNAME: ${MYSQL_USERNAME}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+
+
+      # -----------------------------------------------------
+      # CORS
+      # -----------------------------------------------------
+
+      BILL_SERVICE_ALLOWED_ORIGINS: https://hotelix.online,https://www.hotelix.online
+
+    ports:
+      - "127.0.0.1:8000:8000"
 
     networks:
       - rms-network
@@ -90,9 +145,10 @@ services:
     restart: unless-stopped
 
 
-  # =========================
+  # =========================================================
   # REACT FRONTEND
-  # =========================
+  # =========================================================
+
   frontend:
     build:
       context: ./frontend
@@ -103,9 +159,10 @@ services:
 
     depends_on:
       - backend
+      - bill-service
 
     ports:
-      - "80:80"
+      - "127.0.0.1:8081:80"
 
     networks:
       - rms-network
@@ -113,16 +170,18 @@ services:
     restart: unless-stopped
 
 
-# =========================
+# =========================================================
 # VOLUMES
-# =========================
+# =========================================================
+
 volumes:
   mysql_data:
 
 
-# =========================
+# =========================================================
 # NETWORK
-# =========================
+# =========================================================
+
 networks:
   rms-network:
     driver: bridge

@@ -15,8 +15,8 @@ public class AiWaiterConfig {
     private String hfToken;
 
     /**
-     * WebClient pre-configured for Hugging Face Inference API calls.
-     * Uses Bearer token auth and a 60-second response timeout.
+     * WebClient pre-configured for Groq (OpenAI-compatible) API calls.
+     * Base URL and Bearer token are read from application.properties.
      */
     @Bean(name = "hfWebClient")
     public WebClient hfWebClient(WebClient.Builder builder) {
